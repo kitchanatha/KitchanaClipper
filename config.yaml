@@ -36,7 +36,7 @@ channels:
   mindset_minute:
     name: Mindset Minute
     language: en            # en or th
-    voice_id: nPczCjzI2devNBz1zQrb  # Brian (free default). Your pick after upgrading: bfGb7JTLUnZebZRiFYyq (Adam)
+    voice_id: bfGb7JTLUnZebZRiFYyq  # Adam
     font: Anton             # font family name of a file in fonts/  (Thai: Noto Sans Thai)
     caption_color: "#F2C14E"
     highlight_color: "#FFFFFF"
@@ -54,7 +54,7 @@ channels:
   storytime_cuts:
     name: Storytime Cuts
     language: en
-    voice_id: EXAVITQu4vr4xnSDxMaL  # Sarah (free default). Your pick after upgrading: DODLEQrClDo8wCz460ld (Lauren)
+    voice_id: DODLEQrClDo8wCz460ld  # Lauren
     font: Anton
     caption_color: "#F5E9FF"
     highlight_color: "#FFB86B"
