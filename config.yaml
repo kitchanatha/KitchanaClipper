@@ -105,7 +105,7 @@ channels:
     name: Candlelit Tales
     type: story
     language: en
-    voice_id: PASTE_ELEVENLABS_VOICE_ID   # deep, calm storytelling voice
+    voice_id: JBFqnCBsd6RMkjVDRZzb        # George - warm, captivating British storyteller
     font: Noto Sans                       # subtitles + trailer captions
     title_font: Cinzel                    # intro card + thumbnail
     bg_color: "#15110E"
