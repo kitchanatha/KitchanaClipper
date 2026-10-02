@@ -41,6 +41,8 @@ def _clean(w):
 def group_words(words, language, max_words=3, max_chars=18):
     if language == "th":
         max_words, max_chars = 2, 16
+    elif language == "zh":  # "words" are single characters
+        max_words, max_chars = 7, 8
     groups, cur = [], []
     for w in words:
         text = " ".join(x["word"] for x in cur + [w])

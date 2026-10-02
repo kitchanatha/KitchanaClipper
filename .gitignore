@@ -6,3 +6,12 @@ data/
 __pycache__/
 *.mp4
 uploads.csv
+
+# story mode
+stories/*/cache/
+stories/*/.translation_*.partial.json
+music/*
+!music/README.txt
+# large CJK fonts - run: python run.py fonts
+fonts/NotoSansSC-*.otf
+fonts/NotoSerifSC-*.otf

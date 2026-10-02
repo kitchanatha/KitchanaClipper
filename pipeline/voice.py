@@ -9,27 +9,42 @@ from .common import env
 API = "https://api.elevenlabs.io/v1/text-to-speech/{voice}/with-timestamps"
 
 
-def make_voice(cfg, ch, text, out_mp3):
+def check_voice_id(ch):
     voice = ch.get("voice_id", "")
     if not voice or voice.startswith("PASTE"):
         raise SystemExit(f"Set voice_id for {ch['name']} in config.yaml")
+    return voice
+
+
+def tts_with_timestamps(voice, text, out_mp3, model_id, voice_settings,
+                        previous_text=None, next_text=None, language=None):
+    """One ElevenLabs request. Writes the mp3 and returns the character alignment."""
+    body = {"text": text, "model_id": model_id, "voice_settings": voice_settings}
+    if previous_text:
+        body["previous_text"] = previous_text
+    if next_text:
+        body["next_text"] = next_text
+    if language:
+        body["language_code"] = language
     r = requests.post(
         API.format(voice=voice),
         params={"output_format": "mp3_44100_128"},
         headers={"xi-api-key": env("ELEVENLABS_API_KEY"), "content-type": "application/json"},
-        json={
-            "text": text,
-            "model_id": cfg["elevenlabs"]["model_id"],
-            "voice_settings": {"stability": 0.45, "similarity_boost": 0.8, "style": 0.3},
-        },
-        timeout=180,
+        json=body,
+        timeout=300,
     )
     if r.status_code != 200:
         raise RuntimeError(f"ElevenLabs error {r.status_code}: {r.text[:500]}")
     data = r.json()
     with open(out_mp3, "wb") as f:
         f.write(base64.b64decode(data["audio_base64"]))
-    al = data.get("alignment") or data.get("normalized_alignment")
+    return data.get("alignment") or data.get("normalized_alignment")
+
+
+def make_voice(cfg, ch, text, out_mp3):
+    voice = check_voice_id(ch)
+    al = tts_with_timestamps(voice, text, out_mp3, cfg["elevenlabs"]["model_id"],
+                             {"stability": 0.45, "similarity_boost": 0.8, "style": 0.3})
     return word_timings(text, al, ch.get("language", "en"))
 
 
@@ -55,6 +70,13 @@ def _split_words(text, language):
             else:
                 merged.append((w, s, e))
         return merged
+    if language == "zh":
+        # one caption "word" per Han character (punctuation stays with the character before it);
+        # runs of latin letters / digits stay together
+        for m in re.finditer(r"[A-Za-z0-9]+[^\sA-Za-z0-9一-鿿]*|[一-鿿][^\sA-Za-z0-9"
+                             r"一-鿿]*", text):
+            spans.append((m.group(0), m.start(), m.end()))
+        return spans
     for m in re.finditer(r"\S+", text):
         spans.append((m.group(0), m.start(), m.end()))
     return spans

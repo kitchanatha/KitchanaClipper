@@ -21,9 +21,14 @@ Runs 24/7 on your computers. You control everything from the Discord app on your
    ```
    pip install -r requirements.txt
    ```
-4. **Fonts**: download from fonts.google.com and put the `.ttf` files in the `fonts/` folder:
-   - **Anton** (English captions) → `Anton-Regular.ttf`
-   - **Noto Sans Thai** (only if you post in Thai) → set `font: Noto Sans Thai` for that channel in `config.yaml`
+4. **Fonts**: run `python run.py fonts`. It downloads every font the pipeline uses into `fonts/`
+   (all SIL Open Font License; each licence is saved as `fonts/LICENSE-<Family>.txt`):
+   - **Anton** - Shorts captions (English)
+   - **Cinzel** + **Noto Sans** - Candlelit Tales English titles + subtitles
+   - **Chonburi** + **Noto Sans Thai** - Thai titles + subtitles (set `font: Noto Sans Thai` for a Thai Shorts channel)
+   - **Noto Serif SC** + **Noto Sans SC** - Chinese titles + subtitles. These come from Google's
+     `notofonts/noto-cjk` repo as fixed weights: the google/fonts versions are variable fonts whose
+     default weight is Thin. They are large, so they are not stored in git - run `fonts` on each computer.
 
 Check it works (no keys needed): `python run.py test-video` → opens `test_video.mp4`.
 
@@ -131,11 +136,107 @@ buttons. Approve uploads it straight away.
   *Login Items* (or keep a Terminal window open).
 - Turn on automatic restart after power failure in your BIOS or Energy settings if available.
 
+## 7. Story mode - Candlelit Tales (long narrated stories + Shorts trailers)
+
+Three channels narrate the **same public-domain story**: English (the original text), Thai and
+Simplified Chinese (our **own** translations, made by Claude from the English original - never
+an existing published translation).
+
+| key | channel | language |
+|---|---|---|
+| `candlelit_en` | Candlelit Tales | English |
+| `candlelit_th` | นิทานใต้แสงเทียน | Thai |
+| `candlelit_zh` | 烛光夜话 | Simplified Chinese |
+
+They are **not** part of the daily Shorts run. Settings live in `story:` in `config.yaml`
+(which languages to publish, target length, music volume, crossfades, publish time ...).
+
+### Copyright rules (enforced by the code)
+
+Each story is a folder `stories/<slug>/` with:
+
+- `source.txt` - the original English text (Project Gutenberg files are fine: the header,
+  footer and licence are stripped automatically and "Project Gutenberg" never appears in videos)
+- `story.yaml`:
+  ```yaml
+  title: The Monkey's Paw
+  author: W. W. Jacobs
+  year_published: 1902
+  author_death_year: 1943
+  source_url: https://www.gutenberg.org/ebooks/...
+  rights: public_domain          # or: permission
+  # permission_proof: permission.png   (required for rights: permission - the email/screenshot)
+  # permission_link: https://...       (optional, shown in the description)
+  ```
+
+Every command refuses to work on a story unless:
+- `rights: public_domain` - published **before 1931** (US: 95 years; the year moves forward every
+  January) **and** the author died **more than 50 years ago** (Thailand: life + 50), or
+- `rights: permission` - and the `permission_proof` file exists in the story folder.
+
+Every description credits title, author, year, "Public domain" (or "Narrated with the author's
+permission" + link), "Translated by Candlelit Tales" (Thai / Chinese) and the source link.
+
+### Commands
+
+```
+python run.py story-check the-monkeys-paw              rights check + length / credit estimate
+python run.py story-prep  the-monkeys-paw              clean + translate + titles/hooks/trailers (Claude only)
+python run.py story-build the-monkeys-paw --lang en    narrate + render English
+python run.py story-build the-monkeys-paw              all languages in config
+```
+
+1. **story-prep** writes, in the story folder: `clean_en.txt`, `translation_th.txt`,
+   `translation_zh.txt` (translated in ~1500-word parts with a running glossary - `glossary_th.json`,
+   `glossary_zh.json` - so names stay consistent), `scenes.json` (chapter titles + footage keywords)
+   and `prep_<lang>.json` (title, hook, description, tags, 3 trailer scripts). **Read and edit the
+   translations before building** - story-build narrates whatever is in those files. Re-running
+   prep keeps your edits; `--force` redoes everything.
+2. **story-build** shows the characters and ElevenLabs credits for every language and asks before
+   paying (`--yes` skips the question). Every narration chunk is cached in
+   `stories/<slug>/cache/`, so a failed run continues without paying again, and editing one
+   paragraph only re-records that part. It then makes, per language:
+   - `output/review/<channel>/<slug>/` - `video.mp4` (1920x1080), `thumbnail.jpg` (1280x720),
+     `subtitles.srt`, `meta.json` (description with chapters + credits)
+   - `output/review/<channel>/<slug>-trailer-1..3/` - 45 s Shorts with word-by-word captions
+   `--no-trailers` builds the long video only.
+3. Review and upload as usual (`python run.py review` / `upload`, or Discord). Long videos get
+   the custom thumbnail and the `.srt` as a caption track; trailers upload as Shorts.
+
+The video: spoken hook -> title card (channel, title, author) -> the story over slow, darkened
+landscape footage chosen per scene with long crossfades -> "Subscribe for more stories" card.
+Sentence subtitles are burned in at the bottom (Thai lines break between words using pythainlp,
+Chinese between characters, never before punctuation).
+
+**Music:** put royalty-free ambience tracks (YouTube Studio -> Audio Library) in `music/`. One
+track is looped and ducked under the voice. With an empty folder the video is built without music
+(you get a warning).
+
+**Voices:** put a deep, calm storytelling voice ID for each Candlelit channel in `config.yaml`.
+
+**Sign-in:** the Candlelit channels also upload caption tracks, which needs one extra YouTube
+permission, so connect them with `python run.py auth --channel candlelit_en` (and `_th`, `_zh`)
+like the others - the existing Shorts channels are not affected.
+
+**YouTube limits for story videos:**
+- Videos **longer than 15 minutes** need a **phone-verified** YouTube account
+  (youtube.com/verify). Custom thumbnails need it too.
+- One upload costs ~1,600 of the 10,000 daily quota units (captions +400, thumbnail +50). A full
+  story (3 long videos + 9 trailers) is more than one day's quota - upload it over 2-3 days, or ask
+  for more quota in the audit form.
+
+**Tests:** `python -m unittest discover tests` - rights rules, text cleaning, chunking, timing,
+SRT and Thai/Chinese line breaking, plus a render test (fake footage/voice, no API keys) that
+leaves sample videos in `output/work/render-test/`.
+
 ## Files
 
 | Path | What |
 |---|---|
-| `config.yaml` | channels, style prompts, colors, voice, times |
+| `config.yaml` | channels, style prompts, colors, voice, times, `story:` settings |
+| `stories/<slug>/` | story mode: `source.txt`, `story.yaml`, translations, prep files, `cache/` |
+| `music/` | your ambience tracks for story videos |
+| `tests/` | `python -m unittest discover tests` |
 | `output/review` → `approved` → `uploaded` | each video's folder: `video.mp4`, `script.txt`, `meta.json` |
 | `uploads.csv` | every upload (paste into your Clip Tracker) |
 | `data/errors.log` | details when something fails |

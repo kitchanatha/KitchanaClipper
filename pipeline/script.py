@@ -8,7 +8,7 @@ from .common import env
 
 API = "https://api.anthropic.com/v1/messages"
 
-LANG = {"en": "English", "th": "Thai"}
+LANG = {"en": "English", "th": "Thai", "zh": "Simplified Chinese"}
 
 PROMPT = """You write scripts for the YouTube Shorts channel "{name}".
 
@@ -30,12 +30,15 @@ Return ONLY a JSON object, no markdown, with these keys:
 """
 
 
-def write_script(cfg, ch, recent_topics):
-    recent = "\n".join(f"- {t}" for t in recent_topics[-60:]) or "- (none yet)"
-    prompt = PROMPT.format(
-        name=ch["name"], style=ch["style"].strip(),
-        language=LANG.get(ch.get("language", "en"), "English"), recent=recent,
-    )
+def ask_claude(cfg, prompt, max_tokens=1500, system=None, timeout=120):
+    """One Claude API call; returns the reply text."""
+    body = {
+        "model": cfg["claude"]["model"],
+        "max_tokens": max_tokens,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    if system:
+        body["system"] = system
     r = requests.post(
         API,
         headers={
@@ -43,16 +46,24 @@ def write_script(cfg, ch, recent_topics):
             "anthropic-version": "2023-06-01",
             "content-type": "application/json",
         },
-        json={
-            "model": cfg["claude"]["model"],
-            "max_tokens": 1500,
-            "messages": [{"role": "user", "content": prompt}],
-        },
-        timeout=120,
+        json=body,
+        timeout=timeout,
     )
     if r.status_code != 200:
         raise RuntimeError(f"Claude API error {r.status_code}: {r.text[:500]}")
-    text = "".join(b.get("text", "") for b in r.json()["content"])
+    data = r.json()
+    if data.get("stop_reason") == "max_tokens":
+        raise RuntimeError("Claude reply was cut off (max_tokens) - try a smaller chunk")
+    return "".join(b.get("text", "") for b in data["content"])
+
+
+def write_script(cfg, ch, recent_topics):
+    recent = "\n".join(f"- {t}" for t in recent_topics[-60:]) or "- (none yet)"
+    prompt = PROMPT.format(
+        name=ch["name"], style=ch["style"].strip(),
+        language=LANG.get(ch.get("language", "en"), "English"), recent=recent,
+    )
+    text = ask_claude(cfg, prompt, max_tokens=1500)
     m = re.search(r"\{.*\}", text, re.S)
     if not m:
         raise RuntimeError(f"Claude did not return JSON:\n{text[:500]}")

@@ -7,6 +7,14 @@ from .common import ROOT
 
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload",
           "https://www.googleapis.com/auth/youtube.readonly"]
+# Story channels also upload caption tracks, which needs youtube.force-ssl. Kept separate so the
+# Shorts channels' existing sign-ins stay valid (asking a saved token for new scopes fails).
+STORY_SCOPES = SCOPES + ["https://www.googleapis.com/auth/youtube.force-ssl"]
+YT_LANG = {"en": "en", "th": "th", "zh": "zh-Hans"}
+
+
+def _scopes(ch):
+    return STORY_SCOPES if ch.get("type") == "story" else SCOPES
 CLIENT_SECRET = ROOT / "client_secret.json"
 SCHEDULE = ROOT / "data" / "schedule.json"
 
@@ -19,7 +27,7 @@ def _creds(ch, interactive=False):
     token = ROOT / ch["youtube_token"]
     creds = None
     if token.exists():
-        creds = Credentials.from_authorized_user_file(str(token), SCOPES)
+        creds = Credentials.from_authorized_user_file(str(token), _scopes(ch))
     if creds and creds.expired and creds.refresh_token:
         creds.refresh(Request())
     if not creds or not creds.valid:
@@ -27,7 +35,7 @@ def _creds(ch, interactive=False):
             raise SystemExit(f"Not signed in for {ch['name']}. Run: python run.py auth --channel <key>")
         if not CLIENT_SECRET.exists():
             raise SystemExit("client_secret.json is missing - see README step 4.")
-        flow = InstalledAppFlow.from_client_secrets_file(str(CLIENT_SECRET), SCOPES)
+        flow = InstalledAppFlow.from_client_secrets_file(str(CLIENT_SECRET), _scopes(ch))
         print(f"\nA browser will open. Sign in and CHOOSE THE '{ch['name']}' CHANNEL.\n")
         creds = flow.run_local_server(port=0, prompt="consent")
     token.parent.mkdir(parents=True, exist_ok=True)
@@ -50,7 +58,7 @@ def auth(ch):
               "if this is the wrong channel.")
 
 
-def next_slot(cfg, key):
+def next_slot(cfg, key, times=None):
     """Next free publish time for this channel (one video per slot)."""
     yc = cfg["youtube"]
     sign = 1 if yc["utc_offset"][0] == "+" else -1
@@ -61,7 +69,7 @@ def next_slot(cfg, key):
     now = datetime.now(tz) + timedelta(minutes=30)
     day = now.date()
     for _ in range(60):
-        for t in sorted(yc["publish_times"]):
+        for t in sorted(times or yc["publish_times"]):
             h, m = map(int, t.split(":"))
             slot = datetime(day.year, day.month, day.day, h, m, tzinfo=tz)
             iso = slot.isoformat()
@@ -79,17 +87,27 @@ def upload(cfg, key, ch, folder):
 
     folder = Path(folder)
     meta = json.loads((folder / "meta.json").read_text(encoding="utf-8"))
-    slot = next_slot(cfg, key)
-    tags = list(dict.fromkeys(ch.get("hashtags", []) + meta.get("hashtags", [])))
-    desc = "\n\n".join(x for x in [meta.get("description", ""), ch.get("description_footer", ""),
-                                   " ".join(tags)] if x)
+    kind = meta.get("kind", "short")
+    lang = YT_LANG.get(ch.get("language", "en"), ch.get("language", "en"))
+    if kind in ("story", "trailer"):  # description (with credits) and tags made by story-build
+        st = cfg.get("story", {})
+        slot = next_slot(cfg, key, st.get("publish_times") if kind == "story" else None)
+        desc, tags = meta["description"], meta.get("tags", [])
+        category = str(st.get("category_id", cfg["youtube"]["category_id"]))
+    else:
+        slot = next_slot(cfg, key)
+        tags = list(dict.fromkeys(ch.get("hashtags", []) + meta.get("hashtags", [])))
+        desc = "\n\n".join(x for x in [meta.get("description", ""), ch.get("description_footer", ""),
+                                       " ".join(tags)] if x)
+        category = cfg["youtube"]["category_id"]
     body = {
         "snippet": {
             "title": meta["title"][:100],
             "description": desc[:4900],
             "tags": [t.lstrip("#") for t in tags],
-            "categoryId": cfg["youtube"]["category_id"],
-            "defaultLanguage": ch.get("language", "en"),
+            "categoryId": category,
+            "defaultLanguage": lang,
+            "defaultAudioLanguage": lang,
         },
         "status": {
             "privacyStatus": "private",
@@ -109,4 +127,40 @@ def upload(cfg, key, ch, folder):
     resp = None
     while resp is None:
         _, resp = req.next_chunk()
-    return resp["id"], slot
+    vid = resp["id"]
+    if kind == "story":
+        warnings = _story_extras(yt, vid, folder, meta, lang)
+        if warnings:  # the video is up - report, don't fail (a retry would upload it twice)
+            meta["upload_warnings"] = warnings
+            (folder / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2),
+                                              encoding="utf-8")
+            for w in warnings:
+                print(f"WARNING: {w}")
+    return vid, slot
+
+
+def _story_extras(yt, vid, folder, meta, lang):
+    """Custom thumbnail + SRT caption track. Returns a list of warnings."""
+    from googleapiclient.http import MediaFileUpload
+
+    warnings = []
+    thumb = folder / meta.get("thumbnail", "thumbnail.jpg")
+    if thumb.exists():
+        try:
+            yt.thumbnails().set(videoId=vid, media_body=MediaFileUpload(str(thumb),
+                                                                        mimetype="image/jpeg")).execute()
+        except Exception as e:  # needs a phone-verified channel
+            warnings.append(f"thumbnail not set ({str(e)[:160]}) - verify the channel by phone, "
+                            "then add thumbnail.jpg in YouTube Studio")
+    srt = folder / meta.get("captions", "subtitles.srt")
+    if srt.exists():
+        try:
+            yt.captions().insert(
+                part="snippet",
+                body={"snippet": {"videoId": vid, "language": lang, "name": "Subtitles",
+                                  "isDraft": False}},
+                media_body=MediaFileUpload(str(srt), mimetype="application/octet-stream")).execute()
+        except Exception as e:
+            warnings.append(f"captions not uploaded ({str(e)[:160]}) - add subtitles.srt in "
+                            "YouTube Studio > Subtitles")
+    return warnings

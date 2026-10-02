@@ -14,19 +14,23 @@ PEXELS_SEARCH = "https://api.pexels.com/videos/search"
 PIXABAY_SEARCH = "https://pixabay.com/api/videos/"
 
 
+def _long_side(f):
+    return max(f.get("width") or 0, f.get("height") or 0)
+
+
 def _pexels_pick_file(video):
     files = [f for f in video.get("video_files", [])
-             if f.get("file_type") == "video/mp4" and (f.get("height") or 0) >= 1280]
+             if f.get("file_type") == "video/mp4" and _long_side(f) >= 1280]
     if not files:
         return None
-    files.sort(key=lambda f: abs((f.get("height") or 0) - 1920))
+    files.sort(key=lambda f: abs(_long_side(f) - 1920))
     return files[0]["link"]
 
 
-def _pexels_search(key, q, page, clip_seconds, seen):
+def _pexels_search(key, q, page, clip_seconds, seen, orientation="portrait"):
     """Returns [(history_id, download_url)] for one search."""
     r = requests.get(PEXELS_SEARCH, headers={"Authorization": key},
-                     params={"query": q, "orientation": "portrait", "size": "medium",
+                     params={"query": q, "orientation": orientation, "size": "medium",
                              "per_page": 15, "page": page}, timeout=60)
     if r.status_code != 200:
         raise RuntimeError(f"Pexels error {r.status_code}: {r.text[:300]}")
@@ -40,21 +44,24 @@ def _pexels_search(key, q, page, clip_seconds, seen):
     return out
 
 
-def _pixabay_pick_file(video):
-    # Pixabay has no orientation filter for videos: prefer portrait, else the
-    # sharpest landscape file (it gets center-cropped to 9:16).
+def _pixabay_pick_file(video, orientation="portrait"):
+    # Pixabay has no orientation filter for videos: prefer the wanted orientation, else the
+    # sharpest file of the other one (it gets center-cropped).
     files = [f for f in (video.get("videos") or {}).values()
              if f.get("url") and min(f.get("width") or 0, f.get("height") or 0) >= 720]
     if not files:
         return None, False
-    portrait = [f for f in files if (f.get("height") or 0) > (f.get("width") or 0)]
-    pool = portrait or files
-    pool.sort(key=lambda f: abs(max(f.get("width") or 0, f.get("height") or 0) - 1920))
-    return pool[0]["url"], bool(portrait)
+    if orientation == "landscape":
+        match = [f for f in files if (f.get("width") or 0) > (f.get("height") or 0)]
+    else:
+        match = [f for f in files if (f.get("height") or 0) > (f.get("width") or 0)]
+    pool = match or files
+    pool.sort(key=lambda f: abs(_long_side(f) - 1920))
+    return pool[0]["url"], bool(match)
 
 
-def _pixabay_search(key, q, page, clip_seconds, seen):
-    """Returns [(history_id, download_url)] for one search, portrait clips first.
+def _pixabay_search(key, q, page, clip_seconds, seen, orientation="portrait"):
+    """Returns [(history_id, download_url)] for one search, wanted orientation first.
 
     Pixabay matches any word of the query, so only its top results stay on topic."""
     r = requests.get(PIXABAY_SEARCH,
@@ -62,20 +69,21 @@ def _pixabay_search(key, q, page, clip_seconds, seen):
                              "safesearch": "true", "per_page": 10, "page": page}, timeout=60)
     if r.status_code != 200:
         raise RuntimeError(f"Pixabay error {r.status_code}: {r.text[:300]}")
-    portrait, landscape = [], []
+    wanted, other = [], []
     for v in r.json().get("hits", []):
         hid = f"pixabay_{v['id']}"
         if hid in seen or v.get("duration", 0) < clip_seconds:
             continue
-        link, is_portrait = _pixabay_pick_file(v)
+        link, matches = _pixabay_pick_file(v, orientation)
         if link:
-            (portrait if is_portrait else landscape).append((hid, link))
-    random.shuffle(portrait)
-    random.shuffle(landscape)
-    return portrait + landscape
+            (wanted if matches else other).append((hid, link))
+    random.shuffle(wanted)
+    random.shuffle(other)
+    return wanted + other
 
 
-def get_footage(keywords, extra_hint, needed_seconds, clip_seconds, folder, used_ids):
+def get_footage(keywords, extra_hint, needed_seconds, clip_seconds, folder, used_ids,
+                orientation="portrait"):
     """Download enough clips to cover the voiceover. Returns (file paths, history ids)."""
     if os.environ.get("PEXELS_API_KEY", "").strip():
         key, search, shuffle = env("PEXELS_API_KEY"), _pexels_search, True
@@ -94,7 +102,7 @@ def get_footage(keywords, extra_hint, needed_seconds, clip_seconds, folder, used
         q = queries[qi % len(queries)]
         page = 1 + qi // len(queries)
         qi += 1
-        found = search(key, q, page, clip_seconds, seen)
+        found = search(key, q, page, clip_seconds, seen, orientation)
         if shuffle:
             random.shuffle(found)
         for hid, link in found[:2]:  # max 2 clips per search term keeps it varied

@@ -7,6 +7,12 @@
   python run.py auth --channel storytime_cuts                  connect a YouTube channel (once)
   python run.py test-video                                     offline test: no API keys needed
   python run.py generate --channel X --script my_script.json   use your own script (skips Claude)
+
+Story mode (Candlelit Tales, README section 7):
+  python run.py story-check the-monkeys-paw                     validate rights + show length / cost
+  python run.py story-prep  the-monkeys-paw                     clean + translate + scripts (no audio cost)
+  python run.py story-build the-monkeys-paw --lang en           narrate + render (asks before paying)
+  python run.py fonts                                           download all fonts into fonts/
 """
 import argparse
 import csv
@@ -36,16 +42,19 @@ def check_ffmpeg():
         sys.exit("FFmpeg is not installed or not on PATH - see README step 1.")
 
 
-def channel_keys(cfg, only=None):
+def channel_keys(cfg, only=None, shorts_only=False):
     keys = list(cfg["channels"])
+    if shorts_only:  # story channels are made with story-build, not the Shorts generator
+        keys = [k for k in keys if cfg["channels"][k].get("type") != "story"]
     if only:
-        if only not in cfg["channels"]:
+        if only not in keys:
             sys.exit(f"Unknown channel '{only}'. Options: {', '.join(keys)}")
         return [only]
     return keys
 
 
-def generate_one(cfg, key, script_file=None):
+def generate_one(cfg, key, script_file=None, script=None, folder=None, extra_meta=None):
+    """Make one Short. script / folder / extra_meta let story mode reuse this for trailers."""
     from pipeline.script import write_script
     from pipeline.voice import make_voice
     from pipeline.footage import get_footage
@@ -54,12 +63,18 @@ def generate_one(cfg, key, script_file=None):
     ch = cfg["channels"][key]
     hist = load_history()
     h = hist.setdefault(key, {"topics": [], "pexels_ids": []})
-    print(f"[{ch['name']}] writing script...")
-    s = load_script(script_file) if script_file else write_script(cfg, ch, h["topics"])
+    if script:
+        s = script
+    else:
+        print(f"[{ch['name']}] writing script...")
+        s = load_script(script_file) if script_file else write_script(cfg, ch, h["topics"])
     print(f"[{ch['name']}] '{s['title']}'")
 
-    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    folder = dirs(cfg)["review"] / key / f"{stamp}_{slugify(s.get('topic') or s['title'])}"
+    if folder is None:
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        folder = dirs(cfg)["review"] / key / f"{stamp}_{slugify(s.get('topic') or s['title'])}"
+    folder = Path(folder)
+    shutil.rmtree(folder, ignore_errors=True)
     folder.mkdir(parents=True, exist_ok=True)
     work = dirs(cfg)["work"] / folder.name
     work.mkdir(parents=True, exist_ok=True)
@@ -74,7 +89,8 @@ def generate_one(cfg, key, script_file=None):
         print(f"[{ch['name']}] building video...")
         total = build_video(cfg, ch, clips, folder / "voice.mp3", words, work, folder / "video.mp4")
         meta = {**s, "channel": key, "channel_name": ch["name"], "length_sec": round(total, 1),
-                "created": datetime.now().isoformat(timespec="seconds"), "pexels_ids": ids}
+                "created": datetime.now().isoformat(timespec="seconds"), "pexels_ids": ids,
+                **(extra_meta or {})}
         (folder / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
         (folder / "script.txt").write_text(s["title"] + "\n\n" + s["script"] + "\n", encoding="utf-8")
         h["topics"].append(s.get("topic") or s["title"])
@@ -102,7 +118,7 @@ def load_script(path):
 def cmd_generate(cfg, channel, count, script_file=None):
     check_ffmpeg()
     failures = 0
-    for key in channel_keys(cfg, channel):
+    for key in channel_keys(cfg, channel, shorts_only=True):
         for _ in range(count):
             try:
                 generate_one(cfg, key, script_file)
@@ -239,7 +255,14 @@ def cmd_test(cfg, channel):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=["generate", "daily", "review", "upload", "auth", "test-video"])
+    ap.add_argument("command", choices=["generate", "daily", "review", "upload", "auth", "test-video",
+                                        "story-check", "story-prep", "story-build", "fonts"])
+    ap.add_argument("slug", nargs="?", help="story folder name (story-* commands)")
+    ap.add_argument("--lang", help="story languages, e.g. en or en,th,zh (default: all in config)")
+    ap.add_argument("--yes", action="store_true", help="story-build: don't ask before paying for audio")
+    ap.add_argument("--force", action="store_true",
+                    help="story-prep: redo cleaning/translation/scripts; story-build: rebuild approved")
+    ap.add_argument("--no-trailers", action="store_true", help="story-build: long video only")
     ap.add_argument("--channel", help="channel key from config.yaml (default: all)")
     ap.add_argument("--count", type=int, default=1)
     ap.add_argument("--script", help="JSON file with your own script (generate only, skips Claude)")
@@ -262,6 +285,23 @@ def main():
         auth(cfg["channels"][a.channel])
     elif a.command == "test-video":
         cmd_test(cfg, a.channel)
+    elif a.command == "fonts":
+        from pipeline.fonts import download_fonts
+        download_fonts(cfg["fonts_dir"], force=a.force)
+    elif a.command.startswith("story-"):
+        if not a.slug:
+            sys.exit(f"Usage: python run.py {a.command} <story-folder>")
+        from pipeline import story
+        if a.command == "story-check":
+            story.check(cfg, a.slug)
+        elif a.command == "story-prep":
+            story.prep(cfg, a.slug, a.lang, force=a.force)
+        else:
+            check_ffmpeg()
+            from pipeline.storybuild import build
+            made = build(cfg, a.slug, a.lang, yes=a.yes, force=a.force, trailers=not a.no_trailers)
+            if made:
+                print("\nReady for review:\n  " + "\n  ".join(str(p) for group in made for p in group))
 
 
 if __name__ == "__main__":
