@@ -104,16 +104,22 @@ Videos appear in `output/review/`. Edit the `style:` text in `config.yaml` to ch
 
 The bot posts "PC-1 online" in its control channel.
 
-### Commands (type `/` in the control channel)
+### Control panel (buttons)
 
-| Command | What it does |
+The bot keeps a **control panel** message with buttons at the bottom of its control channel
+(re-posted after every job, so it is always easy to find):
+
+| Button | What it does |
 |---|---|
-| `/status` | Idle or working, paused, next run, videos waiting |
-| `/generate` | Make videos now (choose channel and count 1-5) |
-| `/pending` | Re-post videos waiting for review |
-| `/upload` | Upload all approved videos |
-| `/pause` / `/resume` | Stop or restart the daily run |
-| `/settime 01:30` | Change the daily run time |
+| **Status** | Idle or working, paused, next run, videos waiting |
+| **Make video** | Pick a channel (or all) and make one video now |
+| **Show pending** | Re-post videos waiting for review |
+| **Upload approved** | Upload all approved videos |
+| **Pause / Resume daily run** | Stop or restart the daily run |
+| **Set daily time** | Change the daily run time (24h, e.g. 01:30) |
+
+The same actions also exist as slash commands (`/status`, `/generate`, `/pending`, `/upload`,
+`/pause`, `/resume`, `/settime`), and `/panel` re-posts the button panel.
 
 Every new video arrives as a card with a preview, the script, and **Approve / Reject**
 buttons. Approve uploads it straight away.

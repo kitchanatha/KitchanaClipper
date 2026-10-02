@@ -124,6 +124,8 @@ async def post_card(folder):
 @bot.event
 async def on_interaction(inter: discord.Interaction):
     cid = (inter.data or {}).get("custom_id", "") if inter.type == discord.InteractionType.component else ""
+    if cid.startswith("cp:"):
+        return await handle_panel(inter, cid)
     if not cid.startswith("fp:"):
         return
     _, action, rest = cid.split(":", 2)
@@ -141,7 +143,7 @@ async def on_interaction(inter: discord.Interaction):
             url, slot = await asyncio.to_thread(core.upload_one, cfg, key, dest)
             note += f"\n{upload_note(slot)}\n{url}"
         except BaseException as e:  # SystemExit from missing auth too
-            note += f"\nUpload failed: {e}\nFix it, then use /upload."
+            note += f"\nUpload failed: {e}\nFix it, then tap Upload approved."
     await inter.edit_original_response(view=None, content=note)
 
 
@@ -168,12 +170,14 @@ async def run_generate(keys, count, reason):
         state["last_result"] = f"{datetime.now():%d %b %H:%M}: {made} made, {failed} failed"
         save_state(state)
         await say(f"**{MACHINE}** done: {made} ready for review, {failed} failed.")
+        await post_panel()  # keep the buttons at the bottom of the channel
 
 
 async def daily_loop():
     await bot.wait_until_ready()
     await say(f"**{MACHINE}** online. Channels: {', '.join(MY_CHANNELS)}. "
               f"Daily run at {state['daily_time']}{' (PAUSED)' if state['paused'] else ''}.")
+    await post_panel()
     while not bot.is_closed():
         now = datetime.now()
         today = now.strftime("%Y-%m-%d")
@@ -196,37 +200,24 @@ def counts():
     return "\n".join(out)
 
 
-# ---------------- slash commands ----------------
+# ---------------- actions (used by buttons and slash commands) ----------------
 
-CHOICES = [app_commands.Choice(name="all my channels", value="all")] + [
-    app_commands.Choice(name=cfg["channels"][k]["name"], value=k) for k in MY_CHANNELS]
-
-
-@bot.tree.command(description="Show this computer's status")
-async def status(inter: discord.Interaction):
-    if not only_control(inter):
-        return await inter.response.send_message("Use the control channel.", ephemeral=True)
+def status_text():
     busy = "working on a job" if job_lock.locked() else "idle"
-    await inter.response.send_message(
-        f"**{MACHINE}** is {busy}{' · PAUSED' if state['paused'] else ''}\n"
-        f"Daily run: {state['daily_time']} · Last: {state['last_result']}\n{counts()}")
+    return (f"**{MACHINE}** is {busy}{' · PAUSED' if state['paused'] else ''}\n"
+            f"Daily run: {state['daily_time']} · Last: {state['last_result']}\n{counts()}")
 
 
-@bot.tree.command(description="Make videos now")
-@app_commands.choices(channel=CHOICES)
-@app_commands.describe(count="videos per channel (1-5)")
-async def generate(inter: discord.Interaction, channel: app_commands.Choice[str], count: int = 1):
-    if not only_control(inter):
-        return await inter.response.send_message("Use the control channel.", ephemeral=True)
-    keys = MY_CHANNELS if channel.value == "all" else [channel.value]
-    await inter.response.send_message(f"Starting {max(1, min(count, 5))} per channel...")
-    bot.loop.create_task(run_generate(keys, max(1, min(count, 5)), "manual run"))
+async def do_generate(inter, keys, count=1):
+    count = max(1, min(count, 5))
+    if job_lock.locked():
+        return await inter.response.send_message("A job is already running - wait for it to finish.",
+                                                 ephemeral=True)
+    await inter.response.send_message(f"Starting {count} per channel...")
+    bot.loop.create_task(run_generate(keys, count, f"manual run by {inter.user.display_name}"))
 
 
-@bot.tree.command(description="Re-post videos waiting for review")
-async def pending(inter: discord.Interaction):
-    if not only_control(inter):
-        return await inter.response.send_message("Use the control channel.", ephemeral=True)
+async def do_pending(inter):
     base = Path(cfg["output_dir"]) / "review"
     items = [p for k in MY_CHANNELS for p in sorted((base / k).glob("*")) if (p / "video.mp4").exists()]
     await inter.response.send_message(f"{len(items)} waiting for review.")
@@ -234,10 +225,7 @@ async def pending(inter: discord.Interaction):
         await post_card(p)
 
 
-@bot.tree.command(description="Upload all approved videos now")
-async def upload(inter: discord.Interaction):
-    if not only_control(inter):
-        return await inter.response.send_message("Use the control channel.", ephemeral=True)
+async def do_upload(inter):
     await inter.response.defer()
     base = Path(cfg["output_dir"]) / "approved"
     lines = []
@@ -253,28 +241,15 @@ async def upload(inter: discord.Interaction):
     await inter.followup.send("\n".join(lines) or "Nothing approved to upload.")
 
 
-@bot.tree.command(description="Pause the daily run")
-async def pause(inter: discord.Interaction):
-    if not only_control(inter):
-        return await inter.response.send_message("Use the control channel.", ephemeral=True)
-    state["paused"] = True
+async def do_pause(inter, paused):
+    state["paused"] = paused
     save_state(state)
-    await inter.response.send_message(f"**{MACHINE}** paused.")
+    await inter.response.send_message(
+        f"**{MACHINE}** paused." if paused
+        else f"**{MACHINE}** resumed. Next run at {state['daily_time']}.")
 
 
-@bot.tree.command(description="Resume the daily run")
-async def resume(inter: discord.Interaction):
-    if not only_control(inter):
-        return await inter.response.send_message("Use the control channel.", ephemeral=True)
-    state["paused"] = False
-    save_state(state)
-    await inter.response.send_message(f"**{MACHINE}** resumed. Next run at {state['daily_time']}.")
-
-
-@bot.tree.command(description="Change the daily run time (24h, e.g. 01:30)")
-async def settime(inter: discord.Interaction, time: str):
-    if not only_control(inter):
-        return await inter.response.send_message("Use the control channel.", ephemeral=True)
+async def do_settime(inter, time):
     try:
         t = datetime.strptime(time.strip(), "%H:%M").strftime("%H:%M")
     except ValueError:
@@ -282,6 +257,142 @@ async def settime(inter: discord.Interaction, time: str):
     state["daily_time"] = t
     save_state(state)
     await inter.response.send_message(f"Daily run on **{MACHINE}** set to {t}.")
+
+
+# ---------------- control panel (buttons) ----------------
+
+def panel_view():
+    v = discord.ui.View(timeout=None)
+    for label, cid, style, row in [
+        ("Status", "cp:status", discord.ButtonStyle.secondary, 0),
+        ("Make video", "cp:gen", discord.ButtonStyle.primary, 0),
+        ("Show pending", "cp:pending", discord.ButtonStyle.secondary, 0),
+        ("Upload approved", "cp:upload", discord.ButtonStyle.success, 0),
+        ("Pause daily run", "cp:pause", discord.ButtonStyle.secondary, 1),
+        ("Resume daily run", "cp:resume", discord.ButtonStyle.secondary, 1),
+        ("Set daily time", "cp:settime", discord.ButtonStyle.secondary, 1),
+    ]:
+        v.add_item(discord.ui.Button(label=label, custom_id=cid, style=style, row=row))
+    return v
+
+
+def channel_picker_view():
+    v = discord.ui.View(timeout=300)
+    for k in MY_CHANNELS:
+        v.add_item(discord.ui.Button(label=cfg["channels"][k]["name"], custom_id=f"cp:gen:{k}",
+                                     style=discord.ButtonStyle.primary))
+    if len(MY_CHANNELS) > 1:
+        v.add_item(discord.ui.Button(label="All my channels", custom_id="cp:gen:all",
+                                     style=discord.ButtonStyle.secondary))
+    return v
+
+
+class TimeModal(discord.ui.Modal, title="Daily run time"):
+    def __init__(self):
+        super().__init__()
+        self.time = discord.ui.TextInput(label="Time on this computer (24h, HH:MM)",
+                                         default=state["daily_time"], max_length=5)
+        self.add_item(self.time)
+
+    async def on_submit(self, inter: discord.Interaction):
+        await do_settime(inter, self.time.value)
+
+
+async def post_panel():
+    """Post the button panel at the bottom of the control channel (replacing the old one)."""
+    ch = await control()
+    old = state.get("panel_msg")
+    if old:
+        try:
+            await (await ch.fetch_message(old)).delete()
+        except discord.HTTPException:
+            pass
+    msg = await ch.send(f"**{MACHINE} control panel**", view=panel_view())
+    state["panel_msg"] = msg.id
+    save_state(state)
+
+
+async def handle_panel(inter, cid):
+    if not only_control(inter):
+        return await inter.response.send_message("Use the control channel.", ephemeral=True)
+    if cid == "cp:status":
+        await inter.response.send_message(status_text())
+    elif cid == "cp:gen":
+        await inter.response.send_message("Make one video for:", view=channel_picker_view(),
+                                          ephemeral=True)
+    elif cid.startswith("cp:gen:"):
+        key = cid.split(":", 2)[2]
+        if key != "all" and key not in MY_CHANNELS:
+            return await inter.response.send_message("Unknown channel.", ephemeral=True)
+        await do_generate(inter, MY_CHANNELS if key == "all" else [key])
+    elif cid == "cp:pending":
+        await do_pending(inter)
+    elif cid == "cp:upload":
+        await do_upload(inter)
+    elif cid in ("cp:pause", "cp:resume"):
+        await do_pause(inter, cid == "cp:pause")
+    elif cid == "cp:settime":
+        await inter.response.send_modal(TimeModal())
+
+
+# ---------------- slash commands (backup for the buttons) ----------------
+
+CHOICES = [app_commands.Choice(name="all my channels", value="all")] + [
+    app_commands.Choice(name=cfg["channels"][k]["name"], value=k) for k in MY_CHANNELS]
+
+
+async def guarded(inter, fn, *args):
+    if not only_control(inter):
+        return await inter.response.send_message("Use the control channel.", ephemeral=True)
+    await fn(inter, *args)
+
+
+@bot.tree.command(description="Show this computer's status")
+async def status(inter: discord.Interaction):
+    await guarded(inter, lambda i: i.response.send_message(status_text()))
+
+
+@bot.tree.command(description="Make videos now")
+@app_commands.choices(channel=CHOICES)
+@app_commands.describe(count="videos per channel (1-5)")
+async def generate(inter: discord.Interaction, channel: app_commands.Choice[str], count: int = 1):
+    keys = MY_CHANNELS if channel.value == "all" else [channel.value]
+    await guarded(inter, do_generate, keys, count)
+
+
+@bot.tree.command(description="Re-post videos waiting for review")
+async def pending(inter: discord.Interaction):
+    await guarded(inter, do_pending)
+
+
+@bot.tree.command(description="Upload all approved videos now")
+async def upload(inter: discord.Interaction):
+    await guarded(inter, do_upload)
+
+
+@bot.tree.command(description="Pause the daily run")
+async def pause(inter: discord.Interaction):
+    await guarded(inter, do_pause, True)
+
+
+@bot.tree.command(description="Resume the daily run")
+async def resume(inter: discord.Interaction):
+    await guarded(inter, do_pause, False)
+
+
+@bot.tree.command(description="Change the daily run time (24h, e.g. 01:30)")
+async def settime(inter: discord.Interaction, time: str):
+    await guarded(inter, do_settime, time)
+
+
+async def _post_panel_reply(inter):
+    await inter.response.send_message("Panel posted below.", ephemeral=True)
+    await post_panel()
+
+
+@bot.tree.command(description="Show the button control panel")
+async def panel(inter: discord.Interaction):
+    await guarded(inter, _post_panel_reply)
 
 
 if __name__ == "__main__":
