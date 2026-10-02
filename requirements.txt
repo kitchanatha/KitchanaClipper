@@ -1,0 +1,8 @@
+requests>=2.31
+PyYAML>=6.0
+python-dotenv>=1.0
+google-api-python-client>=2.100
+google-auth-oauthlib>=1.2
+google-auth-httplib2>=0.2
+pythainlp>=5.0   # only needed for Thai channels (word-by-word captions)
+discord.py>=2.4

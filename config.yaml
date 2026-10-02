@@ -1,0 +1,70 @@
+# ===== Faceless Shorts Pipeline - settings =====
+# API keys go in the .env file, not here.
+
+output_dir: output          # review/, approved/, uploaded/ folders are created inside
+fonts_dir: fonts            # put Anton-Regular.ttf and NotoSansThai font files here
+
+video:
+  width: 1080
+  height: 1920
+  fps: 30
+  clip_seconds: 4.5         # how long each stock clip stays on screen
+  darken: 0.45              # 0 = no darkening, 1 = black. Keeps captions readable
+
+claude:
+  model: claude-sonnet-5-5
+
+elevenlabs:
+  model_id: eleven_multilingual_v2   # supports Thai and English
+
+youtube:
+  api_verified: false       # set true only after your Google project passes YouTube's API audit (README step 5)
+  privacy: private          # unverified projects can only upload private videos
+  publish_times: ["12:00", "19:00"]  # local times; each video takes the next free slot
+  utc_offset: "+07:00"      # Bangkok
+  category_id: "22"         # People & Blogs
+  contains_synthetic_media: true     # discloses the AI voice to YouTube
+
+daily_count: 1              # videos per channel per daily run
+
+automation:                 # used by the Discord bot (bot.py)
+  daily_time: "01:30"       # this computer's local time; change from Discord with /settime
+  upload_after_approve: true  # tap Approve in Discord -> uploads and schedules right away
+
+channels:
+
+  mindset_minute:
+    name: Mindset Minute
+    language: en            # en or th
+    voice_id: nPczCjzI2devNBz1zQrb  # Brian (free default). Your pick after upgrading: bfGb7JTLUnZebZRiFYyq (Adam)
+    font: Anton             # font family name of a file in fonts/  (Thai: Noto Sans Thai)
+    caption_color: "#F2C14E"
+    highlight_color: "#FFFFFF"
+    youtube_token: tokens/mindset_minute.json
+    footage_hint: cinematic city, sunrise, focused person, office desk, money, running, mountains
+    hashtags: ["#mindset", "#money", "#selfimprovement", "#shorts"]
+    description_footer: "Follow Mindset Minute for one lesson a day."
+    style: |
+      One practical lesson about money, habits, discipline or mindset.
+      Open with a hook that challenges a common belief in under 10 words.
+      Give one clear idea and one concrete action the viewer can take today.
+      Use plain, punchy sentences. No made-up statistics, no fake quotes, no
+      financial product recommendations. End with: "Follow for one lesson a day."
+
+  storytime_cuts:
+    name: Storytime Cuts
+    language: en
+    voice_id: EXAVITQu4vr4xnSDxMaL  # Sarah (free default). Your pick after upgrading: DODLEQrClDo8wCz460ld (Lauren)
+    font: Anton
+    caption_color: "#F5E9FF"
+    highlight_color: "#FFB86B"
+    youtube_token: tokens/storytime_cuts.json
+    footage_hint: night city, rain on window, phone screen, empty street, apartment, mysterious hallway
+    hashtags: ["#storytime", "#story", "#shorts"]
+    description_footer: "This is a fictional story. Follow Storytime Cuts for more."
+    style: |
+      An ORIGINAL short fictional story told in first person, with a surprising
+      twist. Open with an intriguing first line that creates a question. Keep
+      tension rising; reveal the twist in the final lines. About real-feeling
+      everyday situations (neighbors, wrong texts, strange coincidences).
+      No violence or gore. Sometimes end with "Follow for part 2."
