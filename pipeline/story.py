@@ -11,8 +11,8 @@ from pathlib import Path
 import yaml
 
 from .common import ROOT
-from .storylib import (LANG_NAMES, RightsError, clean_text, group_for_translation, paragraphs,
-                       validate_rights, word_count)
+from .storylib import (LANG_NAMES, RightsError, clean_text, fix_zh_punct, group_for_translation,
+                       paragraphs, validate_rights, word_count)
 
 # rough narration speeds, for length estimates only
 SPEED = {"en": ("words", 150), "th": ("chars", 620), "zh": ("chars", 250)}
@@ -177,27 +177,37 @@ def estimate_minutes(text, lang):
     return n / rate
 
 
-def check(cfg, slug):
+def cleaned_source(d, meta):
+    try:
+        return clean_text((d / "source.txt").read_text(encoding="utf-8"),
+                          meta.get("starts_with"), meta.get("ends_with"))
+    except ValueError as e:
+        raise SystemExit(f"story.yaml: {e}")
+
+
+def check(cfg, slug, log=print):
     d, meta = load_story(cfg, slug)
-    print(f"Rights OK: {meta['title']} by {meta['author']} ({meta.get('rights')})")
-    raw = (d / "source.txt").read_text(encoding="utf-8")
-    clean = clean_text(raw)
+    log(f"Rights OK: {meta['title']} by {meta['author']}, {meta.get('year_published', '?')} "
+        f"({meta.get('rights')}; author died {meta.get('author_death_year', '?')})")
+    clean = cleaned_source(d, meta)
     if "gutenberg" in clean.lower():
-        print("WARNING: 'Gutenberg' still appears in the cleaned text - check source.txt")
+        log("WARNING: 'Gutenberg' still appears in the cleaned text - check source.txt")
     lo, hi = cfg["story"].get("target_minutes", [15, 60])
     cpc = float(cfg["story"].get("credits_per_char", 1.0))
-    print(f"Source: {len(paragraphs(clean))} paragraphs, {word_count(clean, 'en')} words")
+    paras = paragraphs(clean)
+    log(f"Source: {len(paras)} paragraphs, {word_count(clean, 'en'):,} words. "
+        f"Starts: \"{paras[0][:60]}\" ... ends: \"{paras[-1][-60:]}\"")
     for lang, key in story_langs(cfg).items():
         f = text_file(d, lang)
         text = f.read_text(encoding="utf-8") if f.exists() else (clean if lang == "en" else None)
         if text is None:
-            print(f"  {lang} ({key}): not translated yet - run story-prep")
+            log(f"  {lang} ({key}): not translated yet - run story-prep")
             continue
         mins = estimate_minutes(text, lang)
         chars = len(text)
         note = "" if lo <= mins <= hi else f"  <- outside target {lo}-{hi} min"
-        print(f"  {lang} ({key}): {chars:,} characters, ~{mins:.0f} min narration, "
-              f"~{chars * cpc:,.0f} ElevenLabs credits{note}")
+        log(f"  {lang} ({key}): {chars:,} characters, ~{mins:.0f} min narration, "
+            f"~{chars * cpc:,.0f} ElevenLabs credits{note}")
     return d, meta
 
 
@@ -210,8 +220,7 @@ def prep(cfg, slug, langs=None, force=False, log=print):
     langs = story_langs(cfg, langs)
     clean_f = d / "clean_en.txt"
     if force or not clean_f.exists():
-        clean_f.write_text(clean_text((d / "source.txt").read_text(encoding="utf-8")) + "\n",
-                           encoding="utf-8")
+        clean_f.write_text(cleaned_source(d, meta) + "\n", encoding="utf-8")
         log(f"cleaned source -> {clean_f.name}")
     en_text = clean_f.read_text(encoding="utf-8")
 
@@ -257,7 +266,11 @@ def translate(cfg, meta, d, en_text, lang, ask, log=print):
             m = re.search(r"<translation>\s*(.*?)\s*</translation>", reply, re.S)
             if not m:
                 raise RuntimeError(f"Translation reply had no <translation> block:\n{reply[:300]}")
-            out = paragraphs(m.group(1))
+            body = fix_zh_punct(m.group(1)) if lang == "zh" else m.group(1)
+            out = paragraphs(body)
+            if len(out) != len(src):  # sometimes paragraphs come back on single line breaks
+                lines = [x.strip() for x in body.split("\n") if x.strip()]
+                out = lines if len(lines) == len(src) else out
             if len(out) == len(src):
                 break
             log(f"[{lang}]   got {len(out)} paragraphs, expected {len(src)} - "
@@ -281,9 +294,14 @@ def plan_scenes(cfg, en_text, ask):
     words = word_count(en_text, "en")
     n_min, n_max = max(3, min(words // 900, 10)), max(4, min(words // 450, 14))
     numbered = "\n".join(f"[{i}] {p[:400]}" for i, p in enumerate(paras))
-    reply = ask(cfg, SCENES_PROMPT.format(n_min=n_min, n_max=n_max, min_words=max(200, words // (n_max + 2)),
-                                          numbered=numbered), max_tokens=4000, timeout=300)
-    scenes = _json_from(reply).get("scenes") or []
+    prompt = SCENES_PROMPT.format(n_min=n_min, n_max=n_max, min_words=max(200, words // (n_max + 2)),
+                                  numbered=numbered)
+    for attempt in range(2):
+        scenes = _json_from(ask(cfg, prompt, max_tokens=4000, timeout=300)).get("scenes") or []
+        if len(scenes) >= n_min:
+            break
+        prompt += (f"\n\nYou returned only {len(scenes)} scenes. Return between {n_min} and {n_max}: "
+                   "split long parts where the place, time or mood changes.")
     clean, seen = [], set()
     for s in sorted(scenes, key=lambda s: int(s.get("start_paragraph", 0))):
         sp = max(0, min(int(s.get("start_paragraph", 0)), len(paras) - 1))

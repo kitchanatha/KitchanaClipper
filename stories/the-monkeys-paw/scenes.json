@@ -1,0 +1,75 @@
+{
+  "paragraphs": 147,
+  "scenes": [
+    {
+      "start_paragraph": 0,
+      "start_fraction": 0.0,
+      "title": {
+        "en": "A Stormy Night Visitor",
+        "th": "แขกในคืนพายุ",
+        "zh": "风雨夜的访客"
+      },
+      "keywords": [
+        "rainy night cottage",
+        "fireplace glowing",
+        "wind in trees"
+      ]
+    },
+    {
+      "start_paragraph": 49,
+      "start_fraction": 0.3333,
+      "title": {
+        "en": "The First Wish",
+        "th": "คำอธิษฐานแรก",
+        "zh": "第一个愿望"
+      },
+      "keywords": [
+        "dying embers fireplace",
+        "dark window night",
+        "wind storm night"
+      ]
+    },
+    {
+      "start_paragraph": 67,
+      "start_fraction": 0.4558,
+      "title": {
+        "en": "Morning Brings News",
+        "th": "ข่าวยามเช้า",
+        "zh": "清晨的消息"
+      },
+      "keywords": [
+        "winter sunrise",
+        "country road morning",
+        "garden gate frost"
+      ]
+    },
+    {
+      "start_paragraph": 98,
+      "start_fraction": 0.6667,
+      "title": {
+        "en": "Silence After Loss",
+        "th": "ความเงียบหลังสูญเสีย",
+        "zh": "失去之后的寂静"
+      },
+      "keywords": [
+        "cemetery fog",
+        "empty bedroom moonlight",
+        "bare winter trees"
+      ]
+    },
+    {
+      "start_paragraph": 123,
+      "start_fraction": 0.8367,
+      "title": {
+        "en": "A Knock at Midnight",
+        "th": "เสียงเคาะยามเที่ยงคืน",
+        "zh": "午夜的敲门声"
+      },
+      "keywords": [
+        "candle flame dark",
+        "empty street lamp night",
+        "dark staircase shadows"
+      ]
+    }
+  ]
+}

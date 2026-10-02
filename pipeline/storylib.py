@@ -80,10 +80,14 @@ def is_heading(par):
     return bool(_HEADING.match(par.strip()))
 
 
-def clean_text(raw):
+def clean_text(raw, starts_with=None, ends_with=None):
     """Strip Project Gutenberg boilerplate, unwrap hard-wrapped lines into paragraphs,
     keep chapter headings as their own paragraphs. Returns the text with paragraphs
-    separated by one blank line."""
+    separated by one blank line.
+
+    starts_with / ends_with (from story.yaml) drop front matter such as a collection's title
+    page: everything before the first paragraph starting with starts_with, and after the
+    first paragraph (from there on) ending with ends_with."""
     t = raw.replace("﻿", "").replace("\r\n", "\n").replace("\r", "\n")
     m = _GB_START.search(t)
     if m:
@@ -100,7 +104,27 @@ def clean_text(raw):
         if not p or _BOILER.search(p):
             continue
         paras.append(p)
+    if starts_with:
+        i = next((i for i, p in enumerate(paras) if p.startswith(starts_with.strip())), None)
+        if i is None:
+            raise ValueError(f"starts_with {starts_with!r} not found in the text")
+        paras = paras[i:]
+    if ends_with:
+        i = next((i for i, p in enumerate(paras) if p.endswith(ends_with.strip())), None)
+        if i is None:
+            raise ValueError(f"ends_with {ends_with!r} not found in the text")
+        paras = paras[:i + 1]
     return "\n\n".join(paras)
+
+
+_CJK = r"[　-〿一-鿿＀-￯“”‘’]"
+_ZH_PUNCT = {",": "，", ";": "；", ":": "：", "?": "？", "!": "！", "(": "（", ")": "）"}
+
+
+def fix_zh_punct(text):
+    """Half-width , ; : ? ! ( ) next to Chinese characters -> full-width (，；：？！（）)."""
+    pat = re.compile(rf"(?<={_CJK})\s*([,;:?!()])|([,;:?!()])\s*(?={_CJK})")
+    return pat.sub(lambda m: _ZH_PUNCT[m.group(1) or m.group(2)], text)
 
 
 def paragraphs(text):

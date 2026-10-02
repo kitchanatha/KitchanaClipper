@@ -93,6 +93,15 @@ class Cleaning(unittest.TestCase):
         self.assertIn("too late—was amiably desirous", paras[2])
         self.assertNotIn("\n", paras[1])
 
+    def test_starts_with_drops_front_matter(self):
+        raw = GB.replace("I.\n", "THE LADY OF THE BARGE\nAND OTHER STORIES\n\nBy W. W. Jacobs\n\nI.\n")
+        self.assertTrue(L.clean_text(raw).startswith("THE LADY"))
+        t = L.clean_text(raw, starts_with="I.", ends_with="amiably desirous.")
+        self.assertEqual(L.paragraphs(t)[0], "I.")
+        self.assertTrue(t.endswith("amiably desirous."))
+        with self.assertRaises(ValueError):
+            L.clean_text(raw, starts_with="XYZ")
+
     def test_headings(self):
         for h in ("I.", "II", "Chapter 3", "PART IV.", "一", "第三章", "ตอนที่ 2"):
             self.assertTrue(L.is_heading(h), h)
@@ -229,6 +238,11 @@ class Subtitles(unittest.TestCase):
         self.assertTrue(all(len(c["lines"]) <= 2 for c in cues))
         for a, b in zip(cues, cues[1:]):
             self.assertLessEqual(a["end"], b["start"])
+
+    def test_fix_zh_punct(self):
+        self.assertEqual(L.fix_zh_punct("屋外夜寒雨湿,金链花别墅里;他问:你听见了吗?(没有)"),
+                         "屋外夜寒雨湿，金链花别墅里；他问：你听见了吗？（没有）")
+        self.assertEqual(L.fix_zh_punct("W. W. Jacobs, 1902"), "W. W. Jacobs, 1902")  # latin untouched
 
     def test_ass_color(self):
         self.assertEqual(L.ass_color("#F2A541"), "&H0041A5F2")

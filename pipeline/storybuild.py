@@ -12,7 +12,7 @@ from pathlib import Path
 from . import longvideo as lv
 from . import narrate
 from .assemble import duration
-from .story import load_story, read_json, story_langs, text_file, write_json
+from .story import estimate_minutes, load_story, read_json, story_langs, text_file, write_json
 from .storylib import (build_cues, chapters_text, credits_text, is_heading, paragraphs,
                        spoken_heading, split_for_narration, to_srt)
 from .voice import check_voice_id
@@ -67,9 +67,15 @@ def scene_footage(cfg, d, scenes, log):
 
     st = cfg["story"]
     clip_s = float(st["clip_seconds"])
-    per = int(st.get("clips_per_scene", 6))
+    base = int(st.get("clips_per_scene", 6))
+    hint = cfg["channels"][st["channels"].get("en") or next(iter(st["channels"].values()))].get(
+        "footage_hint", "")
+    total_s = estimate_minutes((d / "clean_en.txt").read_text(encoding="utf-8"), "en") * 60
     used, out = [], []
     for i, sc in enumerate(scenes):
+        nxt = scenes[i + 1]["start_fraction"] if i + 1 < len(scenes) else 1.0
+        # about one distinct clip per 45 s of the scene, so long scenes don't loop the same few
+        per = max(base, min(20, int((nxt - sc["start_fraction"]) * total_s / 45)))
         folder = d / "cache" / "footage" / f"scene_{i:02d}"
         man = folder / "clips.json"
         if man.exists():
@@ -78,9 +84,9 @@ def scene_footage(cfg, d, scenes, log):
                 out.append([(str(folder / n), length) for n, length in m["clips"]])
                 used += m.get("ids", [])
                 continue
-        log(f"  footage for scene {i + 1}/{len(scenes)}: {', '.join(sc['keywords'])}")
+        log(f"  footage for scene {i + 1}/{len(scenes)} ({per} clips): {', '.join(sc['keywords'])}")
         shutil.rmtree(folder, ignore_errors=True)
-        paths, ids = get_footage(sc["keywords"], "", (per - 1) * clip_s, clip_s, folder, used,
+        paths, ids = get_footage(sc["keywords"], hint, (per - 1) * clip_s, clip_s, folder, used,
                                  orientation="landscape")
         clips = [(Path(p).name, round(duration(p), 2)) for p in paths]
         write_json(man, {"keywords": sc["keywords"], "clips": clips, "ids": ids})
