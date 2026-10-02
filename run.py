@@ -12,6 +12,7 @@ Story mode (Candlelit Tales, README section 7):
   python run.py story-check the-monkeys-paw                     validate rights + show length / cost
   python run.py story-prep  the-monkeys-paw                     clean + translate + scripts (no audio cost)
   python run.py story-build the-monkeys-paw --lang en           narrate + render (asks before paying)
+  python run.py story-build the-monkeys-paw --lang en --trailers-only   just the 3 Shorts trailers
   python run.py fonts                                           download all fonts into fonts/
 """
 import argparse
@@ -263,6 +264,8 @@ def main():
     ap.add_argument("--force", action="store_true",
                     help="story-prep: redo cleaning/translation/scripts; story-build: rebuild approved")
     ap.add_argument("--no-trailers", action="store_true", help="story-build: long video only")
+    ap.add_argument("--trailers-only", action="store_true",
+                    help="story-build: only the 3 Shorts trailers per language (cheap test)")
     ap.add_argument("--channel", help="channel key from config.yaml (default: all)")
     ap.add_argument("--count", type=int, default=1)
     ap.add_argument("--script", help="JSON file with your own script (generate only, skips Claude)")
@@ -299,7 +302,8 @@ def main():
         else:
             check_ffmpeg()
             from pipeline.storybuild import build
-            made = build(cfg, a.slug, a.lang, yes=a.yes, force=a.force, trailers=not a.no_trailers)
+            made = build(cfg, a.slug, a.lang, yes=a.yes, force=a.force, trailers=not a.no_trailers,
+                         long=not a.trailers_only)
             if made:
                 print("\nReady for review:\n  " + "\n  ".join(str(p) for group in made for p in group))
 

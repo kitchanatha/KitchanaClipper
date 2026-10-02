@@ -199,7 +199,9 @@ python run.py story-build the-monkeys-paw              all languages in config
    - `output/review/<channel>/<slug>/` - `video.mp4` (1920x1080), `thumbnail.jpg` (1280x720),
      `subtitles.srt`, `meta.json` (description with chapters + credits)
    - `output/review/<channel>/<slug>-trailer-1..3/` - 45 s Shorts with word-by-word captions
-   `--no-trailers` builds the long video only.
+   `--no-trailers` builds the long video only; `--trailers-only` builds just the 3 Shorts
+   trailers (~1,800 credits in English) - a cheap way to see how a story does before paying for
+   the full narration.
 3. Review and upload as usual (`python run.py review` / `upload`, or Discord). Long videos get
    the custom thumbnail and the `.srt` as a caption track; trailers upload as Shorts.
 

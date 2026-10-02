@@ -124,7 +124,9 @@ def tags_for(prep, ch):
     return tags
 
 
-def build(cfg, slug, langs=None, yes=False, confirm=None, log=print, force=False, trailers=True):
+def build(cfg, slug, langs=None, yes=False, confirm=None, log=print, force=False, trailers=True,
+          long=True):
+    """long=False builds only the Shorts trailers (cheap way to test a story's appeal)."""
     import run as core
 
     st = cfg["story"]
@@ -146,18 +148,23 @@ def build(cfg, slug, langs=None, yes=False, confirm=None, log=print, force=False
         if not tf.exists() or not pf.exists():
             raise SystemExit(f"[{lang}] run story-prep first ({tf.name} / {pf.name} missing).")
         done = [p for p in (dirs["approved"] / key / slug, dirs["uploaded"] / key / slug) if p.exists()]
-        if done and not force:
+        if long and done and not force:
             log(f"[{lang}] skipped - already approved/uploaded ({done[0]}). Use --force to rebuild.")
             continue
         voice = check_voice_id(ch)
         prep = read_json(pf)
-        units, paras, full = narration_units(cfg, lang, tf.read_text(encoding="utf-8"), prep["hook"])
+        units = paras = full = None
+        chars = 0
         cache = d / "cache" / lang
-        chars, credits, cached = narrate.plan_cost(units, cache, voice, model, settings, cpc)
+        if long:
+            units, paras, full = narration_units(cfg, lang, tf.read_text(encoding="utf-8"), prep["hook"])
+            chars, credits, cached = narrate.plan_cost(units, cache, voice, model, settings, cpc)
+            lines.append(f"  {lang} -> {ch['name']}: {len(units)} chunks ({cached} cached), "
+                         f"{chars:,} new characters ~{credits:,.0f} credits")
         tr_chars = sum(len(t["script"]) for t in prep["trailers"]) if trailers else 0
-        lines.append(f"  {lang} -> {ch['name']}: {len(units)} chunks ({cached} cached), "
-                     f"{chars:,} new characters ~{credits:,.0f} credits"
-                     + (f" + trailers {tr_chars:,} chars ~{tr_chars * cpc:,.0f} credits" if tr_chars else ""))
+        if tr_chars:
+            lines.append(f"  {lang} -> {ch['name']}: {len(prep['trailers'])} trailers, "
+                         f"{tr_chars:,} characters ~{tr_chars * cpc:,.0f} credits")
         plans.append((lang, key, ch, prep, units, paras, full, cache, chars + tr_chars))
     if not plans:
         return []
@@ -170,9 +177,13 @@ def build(cfg, slug, langs=None, yes=False, confirm=None, log=print, force=False
             log("Cancelled - nothing was recorded.")
             return []
 
+    results = []
+    if not long:
+        for lang, key, ch, prep, *_ in plans:
+            results.append(build_trailers(cfg, core, meta, slug, lang, key, ch, prep, log, force))
+        return results
     log("Footage...")
     clips = scene_footage(cfg, d, scenes["scenes"], log)
-    results = []
     for lang, key, ch, prep, units, paras, full, cache, _ in plans:
         results.append(build_language(cfg, core, d, meta, slug, scenes, clips, lang, key, ch, prep,
                                       units, paras, full, cache, model, settings, log, trailers))
@@ -251,17 +262,28 @@ def build_language(cfg, core, d, meta, slug, scenes, clips, lang, key, ch, prep,
     log(f"[{lang}] long video ready -> {out_dir}")
     made = [out_dir]
 
-    # ---- trailers (Shorts, word-by-word captions, existing Shorts builder)
     if trailers:
-        for i, tr in enumerate(prep["trailers"], 1):
-            log(f"[{lang}] trailer {i}/{len(prep['trailers'])}...")
-            tdesc = "\n\n".join([tr.get("description", ""), f"{prep['story_title']} — {ch['name']}",
-                                 credits_text(meta, lang), ch.get("description_footer", ""),
-                                 " ".join(ch.get("hashtags", [])) + " #Shorts"])
-            script = {"title": tr["title"][:100], "script": tr["script"], "keywords": tr["keywords"],
-                      "topic": f"{slug} trailer {i}", "description": tdesc}
-            folder = dirs["review"] / key / f"{slug}-trailer-{i}"
-            made.append(core.generate_one(cfg, key, script=script, folder=folder, extra_meta={
-                "kind": "trailer", "story": slug, "lang": lang, "description": tdesc,
-                "tags": tags_for(prep, ch)}))
+        made += build_trailers(cfg, core, meta, slug, lang, key, ch, prep, log)
+    return made
+
+
+def build_trailers(cfg, core, meta, slug, lang, key, ch, prep, log, force=False):
+    """Shorts trailers with word-by-word captions, made by the existing Shorts builder."""
+    dirs = core.dirs(cfg)
+    made = []
+    for i, tr in enumerate(prep["trailers"], 1):
+        name = f"{slug}-trailer-{i}"
+        done = [p for p in (dirs["approved"] / key / name, dirs["uploaded"] / key / name) if p.exists()]
+        if done and not force:
+            log(f"[{lang}] trailer {i} skipped - already approved/uploaded")
+            continue
+        log(f"[{lang}] trailer {i}/{len(prep['trailers'])}: {tr['title']}")
+        tdesc = "\n\n".join([tr.get("description", ""), f"{prep['story_title']} — {ch['name']}",
+                             credits_text(meta, lang), ch.get("description_footer", ""),
+                             " ".join(ch.get("hashtags", [])) + " #Shorts"])
+        script = {"title": tr["title"][:100], "script": tr["script"], "keywords": tr["keywords"],
+                  "topic": f"{slug} trailer {i}", "description": tdesc}
+        made.append(core.generate_one(cfg, key, script=script, folder=dirs["review"] / key / name,
+                                      extra_meta={"kind": "trailer", "story": slug, "lang": lang,
+                                                  "description": tdesc, "tags": tags_for(prep, ch)}))
     return made
