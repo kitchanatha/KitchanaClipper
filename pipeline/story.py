@@ -205,7 +205,8 @@ def check(cfg, slug, log=print):
         if text is None:
             log(f"  {lang} ({key}): not translated yet - run story-prep")
             continue
-        mins = estimate_minutes(text, lang)
+        speed = float(cfg["story"].get("voice_settings", {}).get("speed", 1.0)) or 1.0
+        mins = estimate_minutes(text, lang) / speed
         chars = len(text)
         note = "" if lo <= mins <= hi else f"  <- outside target {lo}-{hi} min"
         log(f"  {lang} ({key}): {chars:,} characters, ~{mins:.0f} min narration, "
