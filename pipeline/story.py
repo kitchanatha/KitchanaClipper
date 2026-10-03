@@ -17,10 +17,10 @@ from .storylib import (LANG_NAMES, RightsError, clean_text, fix_zh_punct, group_
 # rough narration speeds, for length estimates only
 SPEED = {"en": ("words", 150), "th": ("chars", 620), "zh": ("chars", 250)}
 
-TRAILER_LEN = {
-    "en": "about 110-125 words",
-    "th": "about 400-480 Thai characters",
-    "zh": "about 200-240 Chinese characters",
+TRAILER_LEN = {  # 60-75 s spoken
+    "en": "about 150-185 words",
+    "th": "about 420-520 Thai characters",
+    "zh": "about 270-340 Chinese characters",
 }
 TRAILER_END = {
     "en": "Full story on the channel.",
@@ -86,7 +86,7 @@ about what kind of story it is. No clickbait, no spoilers.
 without spoilers. It is narrated before the title card.
 - "description": 2-3 sentences about the story for the YouTube description, no spoilers.
 - "tags": 12 YouTube tags ({language}; a few English ones are fine)
-- "trailers": 3 objects for 45-second vertical Shorts. Each one retells a REAL suspenseful or \
+- "trailers": 3 objects for 60-75 second vertical Shorts. Each one retells a REAL suspenseful or \
 cliffhanger moment from the text (stay close to the text, do not invent events) and stops before \
 the resolution. Keys: "title" (under 70 characters), "script" (the narration, {trailer_len}, \
 ending exactly with "{ending}"), "keywords" (5 short ENGLISH search terms for vertical stock \

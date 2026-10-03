@@ -103,6 +103,20 @@ def _filter_path(p):
     return p.replace(":", r"\:").replace("'", r"\'")
 
 
+def motion_filter(W, H, amount, dur, i):
+    """Scale + crop to WxH. With amount > 0 the frame is enlarged by that much and the crop
+    window drifts slowly across it (direction alternates per clip), so stills never sit still."""
+    if amount <= 0:
+        return f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}"
+    bw, bh = int(W * (1 + amount)) // 2 * 2, int(H * (1 + amount)) // 2 * 2
+    p = f"min(t/{max(dur, 0.1):.3f},1)"
+    dx, dy = W * amount, H * amount  # drift distance stays small even when the source is much wider
+    cx, cy = "(iw-ow)/2", "(ih-oh)/2"
+    x = [f"{cx}-{dx / 2:.1f}+{dx:.1f}*{p}", f"{cx}+{dx / 2:.1f}-{dx:.1f}*{p}", cx, cx][i % 4]
+    y = [cy, cy, f"{cy}-{dy / 2:.1f}+{dy:.1f}*{p}", f"{cy}+{dy / 2:.1f}-{dy:.1f}*{p}"][i % 4]
+    return (f"scale={bw}:{bh}:force_original_aspect_ratio=increase,crop={W}:{H}:x='{x}':y='{y}'")
+
+
 def build_video(cfg, ch, clips, voice_mp3, words, workdir, out_mp4):
     workdir = Path(workdir)
     v = cfg["video"]
@@ -121,7 +135,7 @@ def build_video(cfg, ch, clips, voice_mp3, words, workdir, out_mp4):
         offset = random.uniform(0, max(src_len - dur - 0.1, 0))
         out = workdir / f"seg_{i:02d}.mp4"
         run(["ffmpeg", "-y", "-ss", f"{offset:.2f}", "-i", str(src), "-t", f"{dur:.3f}", "-an",
-             "-vf", f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
+             "-vf", f"{motion_filter(W, H, float(v.get('motion', 0)), dur, i)},"
                     f"fps={fps},setsar=1,format=yuv420p",
              "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", str(out)])
         seg_files.append(out)

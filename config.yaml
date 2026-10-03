@@ -8,8 +8,10 @@ video:
   width: 1080
   height: 1920
   fps: 30
-  clip_seconds: 4.5         # how long each stock clip stays on screen
+  clip_seconds: 3.0         # how long each stock clip stays on screen (shorter = more variety)
+  motion: 0.12              # slow pan across every clip (0 = still). Keeps the picture moving
   darken: 0.45              # 0 = no darkening, 1 = black. Keeps captions readable
+  script_seconds: [55, 75]  # spoken length Claude aims for (Shorts can be up to 3 minutes)
 
 claude:
   model: claude-sonnet-5-5
@@ -36,19 +38,22 @@ story:                      # story-reading mode (python run.py story-...), see 
     en: candlelit_en
     th: candlelit_th
     zh: candlelit_zh
-  target_minutes: [15, 60]  # story-check warns when a narration is outside this range
+  target_minutes: [15, 90]  # story-check warns when a narration is outside this range
   stories_dir: stories      # one folder per story: source.txt + story.yaml
   translation_words: 1500   # Claude translates in chunks of about this many words
   narration_chunk_chars: 2500   # characters per ElevenLabs request (model limit is higher)
   credits_per_char: 1.0     # ElevenLabs credits per character, for the cost estimate
   model_id: eleven_multilingual_v2
-  voice_settings: {stability: 0.55, similarity_boost: 0.8, style: 0.15}
-  paragraph_pause: 0.6      # seconds of silence between narration chunks
+  voice_settings: {stability: 0.55, similarity_boost: 0.8, style: 0.15, speed: 0.9}
+                            # speed 0.9 = calmer storytelling, ~10% longer, same credits
+  paragraph_pause: 1.0      # seconds of silence between narration chunks
   intro_card_seconds: 4     # channel name + title + author card, after the spoken hook
   outro_card_seconds: 6     # "Subscribe for more stories"
-  clip_seconds: 8           # each footage clip stays 6-10 s ...
-  crossfade_seconds: 2.5    # ... with long slow crossfades
-  clips_per_scene: 6        # distinct clips downloaded per scene (reused with different offsets)
+  clip_seconds: 6           # each footage clip stays 6-10 s ...
+  crossfade_seconds: 2      # ... with long slow crossfades
+  motion: 0.08              # slow drift across every shot (0 = still)
+  clips_per_scene: 6        # minimum distinct clips downloaded per scene ...
+  clip_every_seconds: 25    # ... plus one more per this many seconds of the scene (max 40)
   footage_exclude: [escalator, office, laptop, computer, keyboard, smartphone, phone, car, cars,
                     traffic, highway, skyscraper, mall, airport, subway, neon, business, technology]
                             # stock clips tagged with any of these are skipped (story videos + trailers)

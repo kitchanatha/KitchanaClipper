@@ -75,12 +75,14 @@ def scene_footage(cfg, d, scenes, log, meta=None):
     base = int(st.get("clips_per_scene", 6))
     hint = cfg["channels"][st["channels"].get("en") or next(iter(st["channels"].values()))].get(
         "footage_hint", "")
-    total_s = estimate_minutes((d / "clean_en.txt").read_text(encoding="utf-8"), "en") * 60
+    speed = float(st.get("voice_settings", {}).get("speed", 1.0)) or 1.0
+    total_s = estimate_minutes((d / "clean_en.txt").read_text(encoding="utf-8"), "en") * 60 / speed
     used, out = [], []
     for i, sc in enumerate(scenes):
         nxt = scenes[i + 1]["start_fraction"] if i + 1 < len(scenes) else 1.0
-        # about one distinct clip per 45 s of the scene, so long scenes don't loop the same few
-        per = max(base, min(20, int((nxt - sc["start_fraction"]) * total_s / 45)))
+        # one distinct clip per clip_every_seconds of the scene, so long scenes rarely repeat
+        every = float(st.get("clip_every_seconds", 25))
+        per = max(base, min(40, int((nxt - sc["start_fraction"]) * total_s / every)))
         folder = d / "cache" / "footage" / f"scene_{i:02d}"
         man = folder / "clips.json"
         if man.exists():

@@ -15,8 +15,9 @@ PROMPT = """You write scripts for the YouTube Shorts channel "{name}".
 Channel style:
 {style}
 
-Write ONE new script in {language}. Spoken length 35-50 seconds
-(about 90-130 words in English, or about 250-350 Thai characters).
+Write ONE new script in {language}. Spoken length {s_lo}-{s_hi} seconds
+(about {w_lo}-{w_hi} words in English, about {t_lo}-{t_hi} Thai characters, or about
+{z_lo}-{z_hi} Chinese characters). Keep it tight: every sentence must earn its place.
 It must be clearly different from these recent videos on the channel:
 {recent}
 
@@ -59,11 +60,14 @@ def ask_claude(cfg, prompt, max_tokens=1500, system=None, timeout=120):
 
 def write_script(cfg, ch, recent_topics):
     recent = "\n".join(f"- {t}" for t in recent_topics[-60:]) or "- (none yet)"
+    s_lo, s_hi = cfg["video"].get("script_seconds", [35, 50])
     prompt = PROMPT.format(
         name=ch["name"], style=ch["style"].strip(),
         language=LANG.get(ch.get("language", "en"), "English"), recent=recent,
+        s_lo=s_lo, s_hi=s_hi, w_lo=round(s_lo * 2.5), w_hi=round(s_hi * 2.5),
+        t_lo=round(s_lo * 7), t_hi=round(s_hi * 7), z_lo=round(s_lo * 4.5), z_hi=round(s_hi * 4.5),
     )
-    text = ask_claude(cfg, prompt, max_tokens=1500)
+    text = ask_claude(cfg, prompt, max_tokens=2000)
     m = re.search(r"\{.*\}", text, re.S)
     if not m:
         raise RuntimeError(f"Claude did not return JSON:\n{text[:500]}")

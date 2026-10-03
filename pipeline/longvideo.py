@@ -12,7 +12,7 @@ Rendering plan (efficient for 20-60 minute videos):
 import random
 from pathlib import Path
 
-from .assemble import _filter_path, run
+from .assemble import _filter_path, motion_filter, run
 from .storylib import ass_color, ass_escape, ass_time, display_width, wrap_text
 
 W, H, FPS = 1920, 1080, 30
@@ -169,9 +169,10 @@ def render(cfg, ch, shots, ass_file, voice_wav, total, workdir, out_mp4, music=N
         ins = window_inputs(shots, a_t, b_t, last=(k == len(windows) - 1))
         log(f"  rendering part {k + 1}/{len(windows)} ({fmt(a_t)}-{fmt(b_t)}, {len(ins)} clips)")
         cmd, chains = ["ffmpeg", "-y", "-v", "error"], []
+        motion = float(st.get("motion", 0))
         for j, (src, ss, length, _) in enumerate(ins):
             cmd += ["-stream_loop", "-1", "-ss", f"{ss:.3f}", "-t", f"{length + 0.5:.3f}", "-i", str(src)]
-            chains.append(f"[{j}:v]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
+            chains.append(f"[{j}:v]{motion_filter(W, H, motion, length, k * 7 + j)},"
                           f"fps={FPS},setsar=1,format=yuv420p,trim=duration={length:.3f},"
                           f"setpts=PTS-STARTPTS,settb=AVTB[s{j}]")
         last = "s0"

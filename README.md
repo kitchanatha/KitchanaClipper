@@ -214,7 +214,7 @@ python run.py story-build the-monkeys-paw              all languages in config
    paragraph only re-records that part. It then makes, per language:
    - `output/review/<channel>/<slug>/` - `video.mp4` (1920x1080), `thumbnail.jpg` (1280x720),
      `subtitles.srt`, `meta.json` (description with chapters + credits)
-   - `output/review/<channel>/<slug>-trailer-1..3/` - 45 s Shorts with word-by-word captions
+   - `output/review/<channel>/<slug>-trailer-1..3/` - 60-75 s Shorts with word-by-word captions
    `--no-trailers` builds the long video only; `--trailers-only` builds just the 3 Shorts
    trailers (~1,800 credits in English) - a cheap way to see how a story does before paying for
    the full narration. `--trailer 2,3` rebuilds only those trailers. Trailer voices are cached
