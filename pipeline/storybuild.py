@@ -61,7 +61,12 @@ def paragraph_times(units, paras, full):
     return starts
 
 
-def scene_footage(cfg, d, scenes, log):
+def footage_exclude(cfg, meta):
+    """Config-wide exclusions (modern things) + the story's own (wrong mood for this story)."""
+    return list(cfg["story"].get("footage_exclude", [])) + list((meta or {}).get("footage_exclude", []))
+
+
+def scene_footage(cfg, d, scenes, log, meta=None):
     """Download (once per story, shared by all languages) landscape clips for every scene."""
     from .footage import get_footage
 
@@ -87,7 +92,8 @@ def scene_footage(cfg, d, scenes, log):
         log(f"  footage for scene {i + 1}/{len(scenes)} ({per} clips): {', '.join(sc['keywords'])}")
         shutil.rmtree(folder, ignore_errors=True)
         paths, ids = get_footage(sc["keywords"], hint, (per - 1) * clip_s, clip_s, folder, used,
-                                 orientation="landscape")
+                                 orientation="landscape", exclude=footage_exclude(cfg, meta),
+                                 strict=True)
         clips = [(Path(p).name, round(duration(p), 2)) for p in paths]
         write_json(man, {"keywords": sc["keywords"], "clips": clips, "ids": ids})
         used += ids
@@ -125,7 +131,7 @@ def tags_for(prep, ch):
 
 
 def build(cfg, slug, langs=None, yes=False, confirm=None, log=print, force=False, trailers=True,
-          long=True):
+          long=True, which=None):
     """long=False builds only the Shorts trailers (cheap way to test a story's appeal)."""
     import run as core
 
@@ -161,10 +167,16 @@ def build(cfg, slug, langs=None, yes=False, confirm=None, log=print, force=False
             chars, credits, cached = narrate.plan_cost(units, cache, voice, model, settings, cpc)
             lines.append(f"  {lang} -> {ch['name']}: {len(units)} chunks ({cached} cached), "
                          f"{chars:,} new characters ~{credits:,.0f} credits")
-        tr_chars = sum(len(t["script"]) for t in prep["trailers"]) if trailers else 0
-        if tr_chars:
-            lines.append(f"  {lang} -> {ch['name']}: {len(prep['trailers'])} trailers, "
-                         f"{tr_chars:,} characters ~{tr_chars * cpc:,.0f} credits")
+        tr_chars, n_tr = 0, 0
+        if trailers:
+            for i, t in enumerate(prep["trailers"], 1):
+                if which and i not in which:
+                    continue
+                n_tr += 1
+                if not _trailer_cached(cfg, d, lang, ch, t["script"]):
+                    tr_chars += len(t["script"])
+            lines.append(f"  {lang} -> {ch['name']}: {n_tr} trailer(s), "
+                         f"{tr_chars:,} new characters ~{tr_chars * cpc:,.0f} credits")
         plans.append((lang, key, ch, prep, units, paras, full, cache, chars + tr_chars))
     if not plans:
         return []
@@ -180,10 +192,11 @@ def build(cfg, slug, langs=None, yes=False, confirm=None, log=print, force=False
     results = []
     if not long:
         for lang, key, ch, prep, *_ in plans:
-            results.append(build_trailers(cfg, core, meta, slug, lang, key, ch, prep, log, force))
+            results.append(build_trailers(cfg, core, d, meta, slug, lang, key, ch, prep, log, force,
+                                          which))
         return results
     log("Footage...")
-    clips = scene_footage(cfg, d, scenes["scenes"], log)
+    clips = scene_footage(cfg, d, scenes["scenes"], log, meta)
     for lang, key, ch, prep, units, paras, full, cache, _ in plans:
         results.append(build_language(cfg, core, d, meta, slug, scenes, clips, lang, key, ch, prep,
                                       units, paras, full, cache, model, settings, log, trailers))
@@ -263,15 +276,23 @@ def build_language(cfg, core, d, meta, slug, scenes, clips, lang, key, ch, prep,
     made = [out_dir]
 
     if trailers:
-        made += build_trailers(cfg, core, meta, slug, lang, key, ch, prep, log)
+        made += build_trailers(cfg, core, d, meta, slug, lang, key, ch, prep, log)
     return made
 
 
-def build_trailers(cfg, core, meta, slug, lang, key, ch, prep, log, force=False):
+def _trailer_cached(cfg, d, lang, ch, text):
+    k = narrate.chunk_key(ch.get("voice_id"), cfg["elevenlabs"]["model_id"], "short", text)
+    c = d / "cache" / lang / "trailers"
+    return (c / f"{k}.mp3").exists() and (c / f"{k}.words.json").exists()
+
+
+def build_trailers(cfg, core, d, meta, slug, lang, key, ch, prep, log, force=False, which=None):
     """Shorts trailers with word-by-word captions, made by the existing Shorts builder."""
     dirs = core.dirs(cfg)
     made = []
     for i, tr in enumerate(prep["trailers"], 1):
+        if which and i not in which:
+            continue
         name = f"{slug}-trailer-{i}"
         done = [p for p in (dirs["approved"] / key / name, dirs["uploaded"] / key / name) if p.exists()]
         if done and not force:
@@ -285,5 +306,8 @@ def build_trailers(cfg, core, meta, slug, lang, key, ch, prep, log, force=False)
                   "topic": f"{slug} trailer {i}", "description": tdesc}
         made.append(core.generate_one(cfg, key, script=script, folder=dirs["review"] / key / name,
                                       extra_meta={"kind": "trailer", "story": slug, "lang": lang,
-                                                  "description": tdesc, "tags": tags_for(prep, ch)}))
+                                                  "description": tdesc, "tags": tags_for(prep, ch)},
+                                      voice_cache=d / "cache" / lang / "trailers",
+                                      footage_exclude=footage_exclude(cfg, meta),
+                                      strict_footage=True))
     return made

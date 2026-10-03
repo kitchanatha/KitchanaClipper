@@ -167,7 +167,14 @@ Each story is a folder `stories/<slug>/` with:
   rights: public_domain          # or: permission
   # permission_proof: permission.png   (required for rights: permission - the email/screenshot)
   # permission_link: https://...       (optional, shown in the description)
+  setting: "a remote English country cottage around 1900, winter nights"   # optional, guides footage
+  footage_exclude: [flower, blossom, sunny]   # optional: stock clips tagged like this are skipped
+  starts_with: "I."      # optional: drop front matter (e.g. a collection's title page) before this
   ```
+  `setting` is given to Claude when it picks stock-footage search terms, so they fit the period.
+  `config.yaml` -> `story.footage_exclude` already skips modern things (escalators, offices, cars...).
+  Story footage is picked strictly: the stock site's best-ranked results first, and only clips
+  whose tags share a real subject word with the search ("door", "candle", "hand"...).
 
 Every command refuses to work on a story unless:
 - `rights: public_domain` - published **before 1931** (US: 95 years; the year moves forward every
@@ -201,7 +208,8 @@ python run.py story-build the-monkeys-paw              all languages in config
    - `output/review/<channel>/<slug>-trailer-1..3/` - 45 s Shorts with word-by-word captions
    `--no-trailers` builds the long video only; `--trailers-only` builds just the 3 Shorts
    trailers (~1,800 credits in English) - a cheap way to see how a story does before paying for
-   the full narration.
+   the full narration. `--trailer 2,3` rebuilds only those trailers. Trailer voices are cached
+   too, so re-doing a trailer's visuals is free.
 3. Review and upload as usual (`python run.py review` / `upload`, or Discord). Long videos get
    the custom thumbnail and the `.srt` as a caption track; trailers upload as Shorts.
 

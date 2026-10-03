@@ -91,6 +91,7 @@ cliffhanger moment from the text (stay close to the text, do not invent events) 
 the resolution. Keys: "title" (under 70 characters), "script" (the narration, {trailer_len}, \
 ending exactly with "{ending}"), "keywords" (5 short ENGLISH search terms for vertical stock \
 video that fits the moment, no specific people's faces), "description" (one sentence).
+{footage_rule}
 
 <story>
 {text}
@@ -105,6 +106,7 @@ Return ONLY JSON: {{"scenes": [{{"start_paragraph": 0, "title_en": "...", "title
 - title_*: 2-5 word chapter titles without spoilers, in English, Thai and Simplified Chinese
 - keywords: 3 short English search terms for calm, atmospheric LANDSCAPE stock video matching the \
 scene's setting and mood (places, weather, light, objects - no faces, no text on screen)
+{footage_rule}
 - the first scene starts at paragraph 0; scenes in order
 
 {numbered}"""
@@ -231,7 +233,7 @@ def prep(cfg, slug, langs=None, force=False, log=print):
     scenes_f = d / "scenes.json"
     if force or not scenes_f.exists():
         log("planning scenes...")
-        write_json(scenes_f, plan_scenes(cfg, en_text, ask_claude))
+        write_json(scenes_f, plan_scenes(cfg, en_text, ask_claude, meta))
 
     for lang, key in langs.items():
         out = d / f"prep_{lang}.json"
@@ -289,13 +291,24 @@ def translate(cfg, meta, d, en_text, lang, ask, log=print):
     log(f"[{lang}] translation -> {text_file(d, lang).name} ({len(glossary)} glossary terms)")
 
 
-def plan_scenes(cfg, en_text, ask):
+FOOTAGE_RULE = """Stock video search terms must fit the story's setting: {setting}. Stock sites \
+return modern scenes for vague terms, so prefer timeless subjects - weather, fire, candlelight, \
+nature, night skies, old wooden doors and windows, cottages, period objects - and add words like \
+"old", "vintage", "rustic" or "at night" where they help. Never ask for anything modern \
+(escalators, offices, cars, phones, city streets, modern houses)."""
+
+
+def footage_rule(meta):
+    return FOOTAGE_RULE.format(setting=meta.get("setting") or "the time and place of the story")
+
+
+def plan_scenes(cfg, en_text, ask, meta=None):
     paras = paragraphs(en_text)
     words = word_count(en_text, "en")
     n_min, n_max = max(3, min(words // 900, 10)), max(4, min(words // 450, 14))
     numbered = "\n".join(f"[{i}] {p[:400]}" for i, p in enumerate(paras))
     prompt = SCENES_PROMPT.format(n_min=n_min, n_max=n_max, min_words=max(200, words // (n_max + 2)),
-                                  numbered=numbered)
+                                  numbered=numbered, footage_rule=footage_rule(meta or {}))
     for attempt in range(2):
         scenes = _json_from(ask(cfg, prompt, max_tokens=4000, timeout=300)).get("scenes") or []
         if len(scenes) >= n_min:
@@ -318,11 +331,35 @@ def plan_scenes(cfg, en_text, ask):
     return {"paragraphs": len(paras), "scenes": clean}
 
 
+KEYWORDS_PROMPT = """Here are scripts for vertical stock-video Shorts retelling moments from \
+"{title}" by {author}. For each script give 5 short English search terms for vertical stock video \
+that matches what is happening, in order. {footage_rule}
+Return ONLY JSON: {{"keywords": [["...", "...", "...", "...", "..."], ...]}} - one list per script.
+
+{scripts}"""
+
+
+def refresh_trailer_keywords(cfg, meta, prep, ask=None):
+    """Re-pick the trailers' footage search terms with the setting rule (scripts unchanged)."""
+    if ask is None:
+        from .script import ask_claude as ask
+    scripts = "\n\n".join(f"Script {i}:\n{t['script']}" for i, t in enumerate(prep["trailers"], 1))
+    reply = ask(cfg, KEYWORDS_PROMPT.format(title=meta["title"], author=meta["author"],
+                                            footage_rule=footage_rule(meta), scripts=scripts),
+                max_tokens=1500, timeout=300)
+    lists = _json_from(reply).get("keywords") or []
+    for t, kw in zip(prep["trailers"], lists):
+        if kw:
+            t["keywords"] = [k for k in kw if k][:5]
+    return prep
+
+
 def write_prep(cfg, meta, ch, lang, text, ask):
     reply = ask(cfg, PREP_PROMPT.format(
         channel=ch["name"], language=LANG_NAMES[lang], title=meta["title"], author=meta["author"],
         year=meta.get("year_published", "unknown"), trailer_len=TRAILER_LEN[lang],
-        ending=TRAILER_END[lang], text=text), max_tokens=6000, timeout=600)
+        ending=TRAILER_END[lang], footage_rule=footage_rule(meta), text=text),
+        max_tokens=6000, timeout=600)
     data = _json_from(reply)
     for k in ("story_title", "author_display", "title", "hook", "description", "tags", "trailers"):
         if not data.get(k):

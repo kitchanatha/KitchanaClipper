@@ -49,6 +49,9 @@ story:                      # story-reading mode (python run.py story-...), see 
   clip_seconds: 8           # each footage clip stays 6-10 s ...
   crossfade_seconds: 2.5    # ... with long slow crossfades
   clips_per_scene: 6        # distinct clips downloaded per scene (reused with different offsets)
+  footage_exclude: [escalator, office, laptop, computer, keyboard, smartphone, phone, car, cars,
+                    traffic, highway, skyscraper, mall, airport, subway, neon, business, technology]
+                            # stock clips tagged with any of these are skipped (story videos + trailers)
   darken: 0.35
   music_dir: music          # royalty-free ambience tracks you download (mp3/wav/m4a/ogg/flac)
   music_volume: 0.12        # music level under the voice (it ducks further while the narrator speaks)

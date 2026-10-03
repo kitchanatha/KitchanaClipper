@@ -4,4 +4,7 @@ year_published: 1902          # Harper's Monthly, then the collection "The Lady 
 author_death_year: 1943
 source_url: https://www.gutenberg.org/ebooks/12122
 rights: public_domain
+setting: "a remote English country cottage around 1900, cold wet winter nights, candlelight and firelight"
+footage_exclude: [flower, flowers, blossom, lavender, bee, spring, summer, sunny, beach, food,
+                  meat, sweet, colorful, party, wedding]   # wrong mood for this story
 starts_with: "I."             # skip the collection's title page at the top of source.txt

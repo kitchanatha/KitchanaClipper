@@ -54,8 +54,10 @@ def channel_keys(cfg, only=None, shorts_only=False):
     return keys
 
 
-def generate_one(cfg, key, script_file=None, script=None, folder=None, extra_meta=None):
-    """Make one Short. script / folder / extra_meta let story mode reuse this for trailers."""
+def generate_one(cfg, key, script_file=None, script=None, folder=None, extra_meta=None,
+                 voice_cache=None, footage_exclude=(), strict_footage=False):
+    """Make one Short. script / folder / extra_meta / voice_cache / footage_exclude let story
+    mode reuse this for trailers (a cached voice makes re-doing the visuals free)."""
     from pipeline.script import write_script
     from pipeline.voice import make_voice
     from pipeline.footage import get_footage
@@ -80,13 +82,13 @@ def generate_one(cfg, key, script_file=None, script=None, folder=None, extra_met
     work = dirs(cfg)["work"] / folder.name
     work.mkdir(parents=True, exist_ok=True)
     try:
-        print(f"[{ch['name']}] recording voice...")
-        words = make_voice(cfg, ch, s["script"], folder / "voice.mp3")
+        words = cached_voice(cfg, ch, s["script"], folder / "voice.mp3", voice_cache)
         from pipeline.assemble import duration
         secs = duration(folder / "voice.mp3")
         print(f"[{ch['name']}] finding footage for {secs:.0f}s...")
         clips, ids = get_footage(s["keywords"], ch.get("footage_hint", ""), secs,
-                                 float(cfg["video"]["clip_seconds"]), work, h["pexels_ids"][-300:])
+                                 float(cfg["video"]["clip_seconds"]), work, h["pexels_ids"][-300:],
+                                 exclude=footage_exclude, strict=strict_footage)
         print(f"[{ch['name']}] building video...")
         total = build_video(cfg, ch, clips, folder / "voice.mp3", words, work, folder / "video.mp4")
         meta = {**s, "channel": key, "channel_name": ch["name"], "length_sec": round(total, 1),
@@ -104,6 +106,30 @@ def generate_one(cfg, key, script_file=None, script=None, folder=None, extra_met
         raise
     finally:
         shutil.rmtree(work, ignore_errors=True)
+
+
+def cached_voice(cfg, ch, text, out_mp3, cache_dir=None):
+    """make_voice, optionally cached on disk (mp3 + word timings) so the same text is never
+    paid for twice."""
+    from pipeline.voice import make_voice
+    name = ch["name"]
+    if not cache_dir:
+        print(f"[{name}] recording voice...")
+        return make_voice(cfg, ch, text, out_mp3)
+    from pipeline.narrate import chunk_key
+    cache_dir = Path(cache_dir)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    k = chunk_key(ch.get("voice_id"), cfg["elevenlabs"]["model_id"], "short", text)
+    mp3, wj = cache_dir / f"{k}.mp3", cache_dir / f"{k}.words.json"
+    if mp3.exists() and wj.exists():
+        print(f"[{name}] voice from cache (no credits used)")
+    else:
+        print(f"[{name}] recording voice...")
+        words = make_voice(cfg, ch, text, cache_dir / f"{k}.part.mp3")
+        wj.write_text(json.dumps(words, ensure_ascii=False), encoding="utf-8")
+        (cache_dir / f"{k}.part.mp3").replace(mp3)
+    shutil.copyfile(mp3, out_mp3)
+    return json.loads(wj.read_text(encoding="utf-8"))
 
 
 def load_script(path):
@@ -266,6 +292,7 @@ def main():
     ap.add_argument("--no-trailers", action="store_true", help="story-build: long video only")
     ap.add_argument("--trailers-only", action="store_true",
                     help="story-build: only the 3 Shorts trailers per language (cheap test)")
+    ap.add_argument("--trailer", help="story-build: only these trailer numbers, e.g. 2,3")
     ap.add_argument("--channel", help="channel key from config.yaml (default: all)")
     ap.add_argument("--count", type=int, default=1)
     ap.add_argument("--script", help="JSON file with your own script (generate only, skips Claude)")
@@ -302,8 +329,9 @@ def main():
         else:
             check_ffmpeg()
             from pipeline.storybuild import build
+            which = [int(x) for x in a.trailer.split(",")] if a.trailer else None
             made = build(cfg, a.slug, a.lang, yes=a.yes, force=a.force, trailers=not a.no_trailers,
-                         long=not a.trailers_only)
+                         long=not (a.trailers_only or which), which=which)
             if made:
                 print("\nReady for review:\n  " + "\n  ".join(str(p) for group in made for p in group))
 

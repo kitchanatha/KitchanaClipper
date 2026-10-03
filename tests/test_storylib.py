@@ -264,6 +264,17 @@ class Descriptions(unittest.TestCase):
         self.assertIn("Narrated with the author's permission: https://x.y", perm)
 
 
+class FootageRelevance(unittest.TestCase):
+    def test_relevant(self):
+        from pipeline.footage import relevant
+        self.assertTrue(relevant("old wooden door knocking at night", "door, wood, entrance, old"))
+        self.assertTrue(relevant("candle flame flickering out", "candlelight, flame, dark"))
+        self.assertTrue(relevant("hand raised in firelight", "hands, ring, fingers"))
+        self.assertFalse(relevant("old cottage interior candlelight", "london, bridge, tower, old"))
+        self.assertFalse(relevant("hand raised in firelight", "lavender, bee, flower, garden"))
+        self.assertTrue(relevant("dark night", "anything"))  # only mood words: no filter
+
+
 class RenderPlan(unittest.TestCase):
     def test_shots_and_windows(self):
         clips = [[("a.mp4", 20.0), ("b.mp4", 9.0)], [("c.mp4", 30.0)]]
