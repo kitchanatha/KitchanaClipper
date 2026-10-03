@@ -7,6 +7,8 @@ import asyncio
 import json
 import os
 import subprocess
+import threading
+import time
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -28,6 +30,11 @@ for c in MY_CHANNELS:
         raise SystemExit(f"MACHINE_CHANNELS has unknown channel '{c}'")
 if not MY_CHANNELS:
     raise SystemExit("Set MACHINE_CHANNELS in .env (e.g. mindset_minute)")
+
+# Story mode (Candlelit Tales) runs on the computer with MACHINE_STORIES=yes
+STORY_MODE = os.environ.get("MACHINE_STORIES", "").strip().lower() in ("1", "yes", "true", "on")
+STORY_KEYS = list(dict.fromkeys(cfg.get("story", {}).get("channels", {}).values())) if STORY_MODE else []
+REVIEW_KEYS = MY_CHANNELS + [k for k in STORY_KEYS if k not in MY_CHANNELS]
 
 STATE = ROOT / "data" / f"bot_state_{MACHINE}.json"
 AUTO = cfg.get("automation", {})
@@ -103,10 +110,48 @@ class ReviewView(discord.ui.View):
                                         custom_id=f"fp:r:{key}/{name}"))
 
 
+def make_story_preview(folder):
+    from pipeline.longvideo import preview_clip
+    out = Path(folder) / "preview.mp4"
+    if not out.exists():
+        try:
+            preview_clip(Path(folder) / "video.mp4", out, 60)
+        except Exception:
+            return None
+    return out if out.exists() and out.stat().st_size < MAX_PREVIEW else None
+
+
+def mmss(sec):
+    m, s = divmod(int(sec), 60)
+    return f"{m // 60}:{m % 60:02d}:{s:02d}" if m >= 60 else f"{m}:{s:02d}"
+
+
+async def post_story_card(folder, meta, key):
+    emb = discord.Embed(title=meta["title"][:250], description=meta["description"][:1800],
+                        color=0xF2A541)
+    emb.set_author(name=f"{meta['channel_name']}  ·  long video  ·  {MACHINE}")
+    emb.set_footer(text=f"{mmss(meta['length_sec'])} long  ·  {meta.get('lang', '')}  ·  "
+                        f"{folder.name}  ·  preview = first 60 s")
+    files = []
+    thumb = folder / meta.get("thumbnail", "thumbnail.jpg")
+    if thumb.exists():
+        files.append(discord.File(str(thumb), filename="thumbnail.jpg"))
+        emb.set_image(url="attachment://thumbnail.jpg")
+    preview = await asyncio.to_thread(make_story_preview, folder)
+    if preview:
+        files.append(discord.File(str(preview), filename="preview_first_60s.mp4"))
+    else:
+        emb.add_field(name="Preview", value="Could not make a preview - check the review folder.")
+    ch = await control()
+    await ch.send(embed=emb, files=files, view=ReviewView(key, folder.name))
+
+
 async def post_card(folder):
     folder = Path(folder)
     meta = json.loads((folder / "meta.json").read_text(encoding="utf-8"))
     key = folder.parent.name
+    if meta.get("kind") == "story":
+        return await post_story_card(folder, meta, key)
     emb = discord.Embed(title=meta["title"][:250], description=meta["script"][:3900],
                         color=0x3D1E6D)
     emb.set_author(name=f"{meta['channel_name']}  ·  {MACHINE}")
@@ -138,21 +183,35 @@ async def on_interaction(inter: discord.Interaction):
     approve = action == "a"
     dest = await asyncio.to_thread(core.decide, cfg, folder, approve)
     note = f"Approved by {inter.user.display_name}" if approve else f"Rejected by {inter.user.display_name}"
+    msg = inter.message  # edited directly: a long video's upload can outlast the interaction
     if approve and AUTO.get("upload_after_approve", True):
+        await msg.edit(view=None, content=note + " - uploading...")
         try:
             url, slot = await asyncio.to_thread(core.upload_one, cfg, key, dest)
             note += f"\n{upload_note(slot)}\n{url}"
+            note += upload_warnings(key, dest.name)
         except BaseException as e:  # SystemExit from missing auth too
             note += f"\nUpload failed: {e}\nFix it, then tap Upload approved."
-    await inter.edit_original_response(view=None, content=note)
+    await msg.edit(view=None, content=note[:1990])
+
+
+def upload_warnings(key, name):
+    meta_f = Path(cfg["output_dir"]) / "uploaded" / key / name / "meta.json"
+    try:
+        warns = json.loads(meta_f.read_text(encoding="utf-8")).get("upload_warnings", [])
+    except (OSError, ValueError):
+        return ""
+    return "".join(f"\n⚠️ {w}" for w in warns)
 
 
 # ---------------- jobs ----------------
 
-async def run_generate(keys, count, reason):
+async def run_generate(keys, count, reason, wait=False):
     if job_lock.locked():
-        await say("A job is already running - try again when it finishes.")
-        return
+        if not wait:
+            await say("A job is already running - try again when it finishes.")
+            return
+        await say(f"**{MACHINE}**: {reason} is waiting for the running job to finish...")
     async with job_lock:
         await say(f"**{MACHINE}**: {reason} - making {count} video(s) for {', '.join(keys)}...")
         made, failed = 0, 0
@@ -185,14 +244,14 @@ async def daily_loop():
                 and now.strftime("%H:%M") >= state["daily_time"]):
             state["last_daily"] = today
             save_state(state)
-            await run_generate(MY_CHANNELS, int(cfg.get("daily_count", 1)), "daily run")
+            await run_generate(MY_CHANNELS, int(cfg.get("daily_count", 1)), "daily run", wait=True)
         await asyncio.sleep(30)
 
 
 def counts():
     base = Path(cfg["output_dir"])
     out = []
-    for k in MY_CHANNELS:
+    for k in REVIEW_KEYS:
         n = {s: len([p for p in (base / s / k).glob("*") if p.is_dir()])
              for s in ("review", "approved", "uploaded")}
         out.append(f"{cfg['channels'][k]['name']}: {n['review']} to review, "
@@ -219,7 +278,7 @@ async def do_generate(inter, keys, count=1):
 
 async def do_pending(inter):
     base = Path(cfg["output_dir"]) / "review"
-    items = [p for k in MY_CHANNELS for p in sorted((base / k).glob("*")) if (p / "video.mp4").exists()]
+    items = [p for k in REVIEW_KEYS for p in sorted((base / k).glob("*")) if (p / "video.mp4").exists()]
     await inter.response.send_message(f"{len(items)} waiting for review.")
     for p in items:
         await post_card(p)
@@ -229,7 +288,7 @@ async def do_upload(inter):
     await inter.response.defer()
     base = Path(cfg["output_dir"]) / "approved"
     lines = []
-    for k in MY_CHANNELS:
+    for k in REVIEW_KEYS:
         for p in sorted((base / k).glob("*")):
             if not (p / "video.mp4").exists():
                 continue
@@ -271,7 +330,7 @@ def panel_view():
         ("Pause daily run", "cp:pause", discord.ButtonStyle.secondary, 1),
         ("Resume daily run", "cp:resume", discord.ButtonStyle.secondary, 1),
         ("Set daily time", "cp:settime", discord.ButtonStyle.secondary, 1),
-    ]:
+    ] + ([("Stories", "cp:stories", discord.ButtonStyle.primary, 1)] if STORY_MODE else []):
         v.add_item(discord.ui.Button(label=label, custom_id=cid, style=style, row=row))
     return v
 
@@ -333,6 +392,177 @@ async def handle_panel(inter, cid):
         await do_pause(inter, cid == "cp:pause")
     elif cid == "cp:settime":
         await inter.response.send_modal(TimeModal())
+    elif cid == "cp:stories":
+        await open_stories(inter)
+
+
+# ---------------- story mode (Candlelit Tales) ----------------
+
+def story_slugs():
+    from pipeline.story import stories_root
+    root = stories_root(cfg)
+    return sorted(p.name for p in root.iterdir() if (p / "story.yaml").exists()) if root.exists() else []
+
+
+class Progress:
+    """Collects log lines from a worker thread and posts them to Discord every ~15 s,
+    so long jobs show progress without flooding the channel."""
+
+    STAGE = ("[", "Footage", "Narration", "WARNING", "Rights", "Source", "Prep done", "Cancelled")
+
+    def __init__(self, loop):
+        self.loop, self.buf, self.lock, self.last = loop, [], threading.Lock(), 0.0
+
+    def log(self, *args):
+        line = " ".join(str(a) for a in args)
+        print(line)
+        with self.lock:
+            self.buf.append(line)
+        now = time.time()
+        if now - self.last > 15 or (line.startswith(self.STAGE) and now - self.last > 4):
+            self.last = now
+            asyncio.run_coroutine_threadsafe(self.flush(), self.loop)
+
+    async def flush(self):
+        with self.lock:
+            lines, self.buf = self.buf, []
+        if lines:
+            await say("```\n" + "\n".join(lines)[-1900:] + "\n```")
+
+
+class ConfirmView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=3600)
+        self.ok = None
+
+    @discord.ui.button(label="Record narration", style=discord.ButtonStyle.success)
+    async def yes(self, inter: discord.Interaction, button: discord.ui.Button):
+        self.ok = True
+        await inter.response.edit_message(view=None, content=f"Recording - confirmed by {inter.user.display_name}.")
+        self.stop()
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    async def no(self, inter: discord.Interaction, button: discord.ui.Button):
+        self.ok = False
+        await inter.response.edit_message(view=None, content=f"Cancelled by {inter.user.display_name} - nothing recorded.")
+        self.stop()
+
+
+async def ask_confirm(summary):
+    view = ConfirmView()
+    msg = await (await control()).send(f"```\n{summary[-1700:]}\n```\nRecord this narration?", view=view)
+    await view.wait()
+    if view.ok is None:
+        await msg.edit(view=None, content="No answer within an hour - cancelled, nothing recorded.")
+    return bool(view.ok)
+
+
+def confirm_from_thread(summary):
+    return asyncio.run_coroutine_threadsafe(ask_confirm(summary), bot.loop).result(timeout=3700)
+
+
+async def run_story(action, slug, langs, mode, user):
+    """action: check | prep | build.  mode (build): full | trailers | long."""
+    from pipeline import story, storybuild
+    if job_lock.locked():
+        return await say("A job is already running - try again when it finishes.")
+    async with job_lock:
+        what = {"check": "check", "prep": "prep (Claude only, no audio cost)",
+                "build": {"full": "build", "trailers": "build trailers", "long": "build long video"}[mode]}[action]
+        await say(f"**{MACHINE}**: story {what} - `{slug}` ({langs or 'all languages'}) - started by {user}")
+        prog = Progress(bot.loop)
+        try:
+            if action == "check":
+                await asyncio.to_thread(story.check, cfg, slug, prog.log)
+            elif action == "prep":
+                await asyncio.to_thread(story.prep, cfg, slug, langs, False, prog.log)
+            else:
+                made = await asyncio.to_thread(
+                    storybuild.build, cfg, slug, langs, False, confirm_from_thread, prog.log, False,
+                    mode != "long", mode != "trailers")
+                await prog.flush()
+                for group in made or []:
+                    for folder in group:
+                        await post_card(folder)
+                if made:
+                    await say(f"**{MACHINE}**: story build done - review the cards above.")
+        except SystemExit as e:  # rights refusal, missing prep, missing voice id ...
+            await prog.flush()
+            await say(f"❌ {e}")
+        except BaseException as e:
+            await prog.flush()
+            await say(f"❌ story {action} failed: `{str(e)[:400]}`")
+            with open(ROOT / "data" / "errors.log", "a", encoding="utf-8") as f:
+                f.write(f"\n--- {datetime.now()} story {action} {slug}\n{traceback.format_exc()}")
+        else:
+            await prog.flush()
+    await post_panel()
+
+
+class StoryView(discord.ui.View):
+    """Stories button: pick a story + languages, then Check / Prep / Build."""
+
+    def __init__(self):
+        super().__init__(timeout=900)
+        self.slug, self.langs = None, None
+        slugs = story_slugs()[:25]
+        pick = discord.ui.Select(placeholder="Choose a story", options=[
+            discord.SelectOption(label=s, value=s) for s in slugs] or [
+            discord.SelectOption(label="(no stories yet)", value="-")])
+        pick.callback = self.on_story
+        self.add_item(pick)
+        langs = list(cfg["story"]["channels"])
+        lang = discord.ui.Select(placeholder="Languages: all", min_values=1, max_values=len(langs),
+                                 options=[discord.SelectOption(label=l, value=l) for l in langs])
+        lang.callback = self.on_lang
+        self.add_item(lang)
+        for label, action, mode, style in [
+            ("Check", "check", None, discord.ButtonStyle.secondary),
+            ("Prep (no audio cost)", "prep", None, discord.ButtonStyle.secondary),
+            ("Build trailers", "build", "trailers", discord.ButtonStyle.primary),
+            ("Build long video", "build", "long", discord.ButtonStyle.primary),
+            ("Build everything", "build", "full", discord.ButtonStyle.success),
+        ]:
+            b = discord.ui.Button(label=label, style=style, row=2 if action == "build" else 3)
+            b.callback = self.make_action(action, mode)
+            self.add_item(b)
+
+    async def on_story(self, inter):
+        self.slug = inter.data["values"][0]
+        await inter.response.defer()
+
+    async def on_lang(self, inter):
+        self.langs = ",".join(inter.data["values"])
+        await inter.response.defer()
+
+    def make_action(self, action, mode):
+        async def go(inter):
+            if not self.slug or self.slug == "-":
+                return await inter.response.send_message("Choose a story first.", ephemeral=True)
+            await inter.response.send_message(f"Starting {action} for `{self.slug}`...", ephemeral=True)
+            bot.loop.create_task(run_story(action, self.slug, self.langs, mode or "full",
+                                           inter.user.display_name))
+        return go
+
+
+async def open_stories(inter):
+    if not STORY_MODE:
+        return await inter.response.send_message("Story mode is off on this computer.", ephemeral=True)
+    await inter.response.send_message("**Stories** - choose a story and languages (default: all), "
+                                      "then an action. Builds ask before paying for narration.",
+                                      view=StoryView(), ephemeral=True)
+
+
+async def slug_autocomplete(inter: discord.Interaction, current: str):
+    return [app_commands.Choice(name=s, value=s) for s in story_slugs() if current.lower() in s][:25]
+
+
+LANG_CHOICES = [app_commands.Choice(name="all languages", value="all")] + [
+    app_commands.Choice(name=l, value=l) for l in cfg.get("story", {}).get("channels", {})]
+
+
+def story_langs_arg(languages):
+    return None if not languages or languages.value == "all" else languages.value
 
 
 # ---------------- slash commands (backup for the buttons) ----------------
@@ -393,6 +623,38 @@ async def _post_panel_reply(inter):
 @bot.tree.command(description="Show the button control panel")
 async def panel(inter: discord.Interaction):
     await guarded(inter, _post_panel_reply)
+
+
+if STORY_MODE:
+    async def _story_cmd(inter, action, slug, languages, mode="full"):
+        if not only_control(inter):
+            return await inter.response.send_message("Use the control channel.", ephemeral=True)
+        await inter.response.send_message(f"Starting story {action} for `{slug}`...")
+        bot.loop.create_task(run_story(action, slug, story_langs_arg(languages), mode,
+                                       inter.user.display_name))
+
+    @bot.tree.command(name="story-check", description="Check a story's rights and length / credit estimate")
+    @app_commands.autocomplete(slug=slug_autocomplete)
+    async def story_check_cmd(inter: discord.Interaction, slug: str):
+        await _story_cmd(inter, "check", slug, None)
+
+    @bot.tree.command(name="story-prep", description="Clean + translate + titles/trailer scripts (no audio cost)")
+    @app_commands.autocomplete(slug=slug_autocomplete)
+    @app_commands.choices(languages=LANG_CHOICES)
+    async def story_prep_cmd(inter: discord.Interaction, slug: str,
+                             languages: app_commands.Choice[str] = None):
+        await _story_cmd(inter, "prep", slug, languages)
+
+    @bot.tree.command(name="story-build", description="Narrate + render (asks before paying)")
+    @app_commands.autocomplete(slug=slug_autocomplete)
+    @app_commands.choices(languages=LANG_CHOICES, what=[
+        app_commands.Choice(name="everything (long video + trailers)", value="full"),
+        app_commands.Choice(name="trailers only", value="trailers"),
+        app_commands.Choice(name="long video only", value="long")])
+    async def story_build_cmd(inter: discord.Interaction, slug: str,
+                              languages: app_commands.Choice[str] = None,
+                              what: app_commands.Choice[str] = None):
+        await _story_cmd(inter, "build", slug, languages, what.value if what else "full")
 
 
 if __name__ == "__main__":

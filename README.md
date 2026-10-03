@@ -126,6 +126,15 @@ The bot keeps a **control panel** message with buttons at the bottom of its cont
 The same actions also exist as slash commands (`/status`, `/generate`, `/pending`, `/upload`,
 `/pause`, `/resume`, `/settime`), and `/panel` re-posts the button panel.
 
+**Stories (Candlelit Tales)** - on the computer with `MACHINE_STORIES=yes` in `.env`, the panel
+has a **Stories** button: choose a story and languages (default all), then **Check**, **Prep**
+(Claude only, no audio cost), **Build trailers**, **Build long video** or **Build everything**.
+Builds post the cost and wait for **Record narration / Cancel** before spending ElevenLabs
+credits, report progress every ~15 s, and finish with a review card per video: long videos show
+the thumbnail, title, length and the first 60 seconds; trailers look like Shorts cards. Approve /
+Reject work the same as for Shorts. Slash commands: `/story-check`, `/story-prep`, `/story-build`.
+While a story job runs, the daily Shorts run waits for it instead of being skipped.
+
 Every new video arrives as a card with a preview, the script, and **Approve / Reject**
 buttons. Approve uploads it straight away.
 
