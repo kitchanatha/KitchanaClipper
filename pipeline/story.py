@@ -265,7 +265,7 @@ def translate(cfg, meta, d, en_text, lang, ask, log=print):
             glossary=json.dumps(glossary, ensure_ascii=False, indent=0) if glossary else "(empty)",
             context=context or "(this is the beginning)", text="\n\n".join(src))
         for attempt in range(2):
-            reply = ask(cfg, prompt, max_tokens=12000, system=TRANSLATE_SYSTEM, timeout=600)
+            reply = ask(cfg, prompt, max_tokens=16000, system=TRANSLATE_SYSTEM, timeout=900)
             m = re.search(r"<translation>\s*(.*?)\s*</translation>", reply, re.S)
             if not m:
                 raise RuntimeError(f"Translation reply had no <translation> block:\n{reply[:300]}")
@@ -311,7 +311,7 @@ def plan_scenes(cfg, en_text, ask, meta=None):
     prompt = SCENES_PROMPT.format(n_min=n_min, n_max=n_max, min_words=max(200, words // (n_max + 2)),
                                   numbered=numbered, footage_rule=footage_rule(meta or {}))
     for attempt in range(2):
-        scenes = _json_from(ask(cfg, prompt, max_tokens=4000, timeout=300)).get("scenes") or []
+        scenes = _json_from(ask(cfg, prompt, max_tokens=12000, timeout=600)).get("scenes") or []
         if len(scenes) >= n_min:
             break
         prompt += (f"\n\nYou returned only {len(scenes)} scenes. Return between {n_min} and {n_max}: "
@@ -347,7 +347,7 @@ def refresh_trailer_keywords(cfg, meta, prep, ask=None):
     scripts = "\n\n".join(f"Script {i}:\n{t['script']}" for i, t in enumerate(prep["trailers"], 1))
     reply = ask(cfg, KEYWORDS_PROMPT.format(title=meta["title"], author=meta["author"],
                                             footage_rule=footage_rule(meta), scripts=scripts),
-                max_tokens=1500, timeout=300)
+                max_tokens=8000, timeout=300)
     lists = _json_from(reply).get("keywords") or []
     for t, kw in zip(prep["trailers"], lists):
         if kw:
@@ -360,7 +360,7 @@ def write_prep(cfg, meta, ch, lang, text, ask):
         channel=ch["name"], language=LANG_NAMES[lang], title=meta["title"], author=meta["author"],
         year=meta.get("year_published", "unknown"), trailer_len=TRAILER_LEN[lang],
         ending=TRAILER_END[lang], footage_rule=footage_rule(meta), text=text),
-        max_tokens=6000, timeout=600)
+        max_tokens=16000, timeout=900)
     data = _json_from(reply)
     for k in ("story_title", "author_display", "title", "hook", "description", "tags", "trailers"):
         if not data.get(k):
