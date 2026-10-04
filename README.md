@@ -183,7 +183,9 @@ Each story is a folder `stories/<slug>/` with:
   `setting` is given to Claude when it picks stock-footage search terms, so they fit the period.
   `config.yaml` -> `story.footage_exclude` already skips modern things (escalators, offices, cars...).
   Story footage is picked strictly: the stock site's best-ranked results first, and only clips
-  whose tags share a real subject word with the search ("door", "candle", "hand"...).
+  whose tags share a real subject word with the search ("door", "candle", "hand"...). Shorts do
+  the same with `video.strict_footage: true`; if that finds too few clips for an unusual topic it
+  tops up with the normal search.
 
 Every command refuses to work on a story unless:
 - `rights: public_domain` - published **before 1931** (US: 95 years; the year moves forward every

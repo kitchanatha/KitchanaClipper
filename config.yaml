@@ -10,6 +10,7 @@ video:
   fps: 30
   clip_seconds: 3.0         # how long each stock clip stays on screen (shorter = more variety)
   motion: 0.12              # slow pan across every clip (0 = still). Keeps the picture moving
+  strict_footage: true      # only clips whose tags match the search (tops up loosely if too few)
   darken: 0.45              # 0 = no darkening, 1 = black. Keeps captions readable
   script_seconds: [55, 75]  # spoken length Claude aims for (Shorts can be up to 3 minutes)
 

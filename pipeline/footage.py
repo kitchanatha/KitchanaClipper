@@ -161,6 +161,12 @@ def get_footage(keywords, extra_hint, needed_seconds, clip_seconds, folder, used
             ids.append(hid)
             if len(paths) >= need:
                 break
+    # strict search found too few for an unusual topic: top up with the loose search
+    enough = max(3, need // 3)
+    if strict and len(paths) < enough:
+        more, more_ids = get_footage(keywords, extra_hint, (enough - len(paths) - 1) * clip_seconds,
+                                     clip_seconds, folder, list(seen), orientation, exclude, False)
+        paths, ids = paths + more, ids + more_ids
     if not paths:
         raise RuntimeError("No stock footage found - try different keywords/footage_hint")
     return paths, ids
