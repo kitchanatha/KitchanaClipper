@@ -101,6 +101,13 @@ def make_preview(folder):
     return out if out.exists() and out.stat().st_size < MAX_PREVIEW else None
 
 
+def caption_buttons(view, key, name, row=1):
+    view.add_item(discord.ui.Button(label="Facebook caption", emoji="📘", row=row,
+                                    style=discord.ButtonStyle.secondary, custom_id=f"fp:fb:{key}/{name}"))
+    view.add_item(discord.ui.Button(label="Instagram caption", emoji="📸", row=row,
+                                    style=discord.ButtonStyle.secondary, custom_id=f"fp:ig:{key}/{name}"))
+
+
 class ReviewView(discord.ui.View):
     def __init__(self, key, name):
         super().__init__(timeout=None)
@@ -108,6 +115,38 @@ class ReviewView(discord.ui.View):
                                         custom_id=f"fp:a:{key}/{name}"))
         self.add_item(discord.ui.Button(label="Reject", style=discord.ButtonStyle.danger,
                                         custom_id=f"fp:r:{key}/{name}"))
+        caption_buttons(self, key, name)
+
+
+class CaptionView(discord.ui.View):
+    """What stays on a card after Approve: the caption buttons for Facebook / Instagram."""
+
+    def __init__(self, key, name):
+        super().__init__(timeout=None)
+        caption_buttons(self, key, name, row=0)
+
+
+def find_video(key, name):
+    for state in ("review", "approved", "uploaded", "rejected"):
+        p = Path(cfg["output_dir"]) / state / key / name
+        if (p / "meta.json").exists():
+            return p
+    return None
+
+
+async def send_caption(inter, platform, key, name):
+    folder = find_video(key, name)
+    if not folder:
+        return await inter.response.send_message("Can't find that video any more.", ephemeral=True)
+    await inter.response.defer(ephemeral=True, thinking=True)
+    from pipeline.social import ensure_social
+    try:
+        social = await asyncio.to_thread(ensure_social, cfg, key, folder)
+    except Exception as e:
+        return await inter.followup.send(f"Couldn't write captions: {str(e)[:300]}", ephemeral=True)
+    # just the caption, so long-press -> Copy Text copies exactly what to paste
+    await inter.followup.send(social["facebook" if platform == "fb" else "instagram"][:1990],
+                              ephemeral=True)
 
 
 def make_story_preview(folder):
@@ -175,6 +214,8 @@ async def on_interaction(inter: discord.Interaction):
         return
     _, action, rest = cid.split(":", 2)
     key, name = rest.split("/", 1)
+    if action in ("fb", "ig"):
+        return await send_caption(inter, action, key, name)
     folder = Path(cfg["output_dir"]) / "review" / key / name
     if not folder.exists():
         await inter.response.send_message("Already handled.", ephemeral=True)
@@ -184,15 +225,16 @@ async def on_interaction(inter: discord.Interaction):
     dest = await asyncio.to_thread(core.decide, cfg, folder, approve)
     note = f"Approved by {inter.user.display_name}" if approve else f"Rejected by {inter.user.display_name}"
     msg = inter.message  # edited directly: a long video's upload can outlast the interaction
+    keep = CaptionView(key, dest.name) if approve else None  # captions stay for posting elsewhere
     if approve and AUTO.get("upload_after_approve", True):
-        await msg.edit(view=None, content=note + " - uploading...")
+        await msg.edit(view=keep, content=note + " - uploading...")
         try:
             url, slot = await asyncio.to_thread(core.upload_one, cfg, key, dest)
             note += f"\n{upload_note(slot)}\n{url}"
             note += upload_warnings(key, dest.name)
         except BaseException as e:  # SystemExit from missing auth too
             note += f"\nUpload failed: {e}\nFix it, then tap Upload approved."
-    await msg.edit(view=None, content=note[:1990])
+    await msg.edit(view=keep, content=note[:1990])
 
 
 def upload_warnings(key, name):

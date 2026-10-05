@@ -273,6 +273,8 @@ def build_language(cfg, core, d, meta, slug, scenes, clips, lang, key, ch, prep,
          "length_sec": round(total, 1), "chapters": chapter_list, "thumbnail": "thumbnail.jpg",
          "captions": "subtitles.srt", "created": datetime.now().isoformat(timespec="seconds")}
     write_json(out_dir / "meta.json", m)
+    from .social import add_social
+    add_social(cfg, key, out_dir, log)
     shutil.rmtree(work, ignore_errors=True)
     log(f"[{lang}] long video ready -> {out_dir}")
     made = [out_dir]

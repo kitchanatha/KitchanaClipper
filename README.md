@@ -138,6 +138,14 @@ While a story job runs, the daily Shorts run waits for it instead of being skipp
 Every new video arrives as a card with a preview, the script, and **Approve / Reject**
 buttons. Approve uploads it straight away.
 
+Each card also has **Facebook caption** and **Instagram caption** buttons (they stay after
+Approve). Tapping one sends you just that caption, privately - long-press it, *Copy Text*, and
+paste it into Facebook / Instagram. Claude writes them when the video is made (no spoilers, no
+links, AI-voice disclosure, credits for public-domain stories); for older videos they are written
+the first time you tap. They are also saved as `social.txt` in the video's folder. Put your
+Instagram handles in `config.yaml` -> `social.handles` so captions say "follow @...". Turn on the
+platform's AI label when posting.
+
 ### Keep the computer running 24/7
 - **Windows:** Settings → System → Power → Sleep: **Never**. Make it start at boot: press
   Win+R, type `shell:startup`, and put a **shortcut** to `start_bot.bat` in that folder.

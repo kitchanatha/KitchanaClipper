@@ -100,6 +100,9 @@ def generate_one(cfg, key, script_file=None, script=None, folder=None, extra_met
         h["topics"].append(s.get("topic") or s["title"])
         h["pexels_ids"].extend(ids)
         save_history(hist)
+        from pipeline.social import add_social
+        print(f"[{ch['name']}] writing Facebook / Instagram captions...")
+        add_social(cfg, key, folder)
         print(f"[{ch['name']}] done -> {folder}")
         return folder
     except BaseException:

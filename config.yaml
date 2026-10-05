@@ -30,6 +30,13 @@ youtube:
 
 daily_count: 1              # videos per channel per daily run
 
+social:                     # Facebook + Instagram captions for every video (Discord card buttons)
+  enabled: true
+  handles:                  # your Instagram @handles, used in "follow @..." - leave "" until they exist
+    mindset_minute: ""
+    storytime_cuts: ""
+    candlelit_en: ""
+
 automation:                 # used by the Discord bot (bot.py)
   daily_time: "01:30"       # this computer's local time; change from Discord with /settime
   upload_after_approve: true  # tap Approve in Discord -> uploads and schedules right away
