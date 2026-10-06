@@ -30,12 +30,41 @@ youtube:
 
 daily_count: 1              # videos per channel per daily run
 
+news:                       # Thai news recaps (สรุปให้ฟัง) - README section 8. Safety rules are in code.
+  channel: summed_up
+  dir: news                 # news/<date>-<topic>/research.json, script.json, voice
+  min_outlets: 2            # a fact needs this many DIFFERENT credible outlets (the rule says 2)
+  min_beats: 4
+  max_beats: 7
+  script_seconds: [60, 90]
+  max_searches: 10          # web searches per research run
+  closing_line: "ติดตามสรุปให้ฟัง เพื่อไม่พลาดเรื่องที่คนพูดถึง"
+  disclaimer: "สรุปจากรายงานของสื่อที่ระบุด้านบน ข้อกล่าวหาเป็นเพียงข้อกล่าวหาจนกว่าจะมีคำตัดสิน · เสียงบรรยายโดย AI"
+  darken: 0.55
+  category_id: "25"         # News & Politics
+  publish_times: ["12:00", "18:00"]
+  footage_exclude: [face, portrait, man, woman, people, crowd, protest, police, flag, logo]
+  credible_outlets:         # domain -> outlet name. Only these are searched, and only these count.
+    thaipbs.or.th: Thai PBS
+    thaipbsworld.com: Thai PBS          # same newsroom - counts as one outlet
+    bangkokpost.com: Bangkok Post
+    thairath.co.th: Thairath
+    matichon.co.th: Matichon
+    khaosod.co.th: Khaosod
+    khaosodenglish.com: Khaosod         # same newsroom - counts as one outlet
+    thestandard.co: The Standard
+    prachachat.net: Prachachat
+    pptvhd36.com: PPTV
+    reuters.com: Reuters
+    apnews.com: AP
+
 social:                     # Facebook + Instagram captions for every video (Discord card buttons)
   enabled: true
   handles:                  # your Instagram @handles, used in "follow @..." - leave "" until they exist
     mindset_minute: ""
     storytime_cuts: ""
     candlelit_en: ""
+    summed_up: "@สรุปให้ฟังOfficial"
 
 automation:                 # used by the Discord bot (bot.py)
   daily_time: "01:30"       # this computer's local time; change from Discord with /settime
@@ -161,3 +190,22 @@ channels:
     footage_hint: candlelight, foggy forest, old house at night, moonlit clouds, fireplace
     hashtags: ["#故事", "#有声书", "#经典故事", "#睡前故事"]
     description_footer: "Also in English / ภาษาไทย / 中文"
+
+  # ---------- Thai news recaps (made with news-research / news-build, never by the daily run) ----------
+
+  summed_up:
+    name: สรุปให้ฟัง
+    type: news
+    language: th
+    handle: "@สรุปให้ฟังOfficial"
+    voice_id: PASTE_ELEVENLABS_VOICE_ID   # clear, neutral Thai news voice
+    font: Kanit                           # card text + captions (Kanit Bold)
+    title_font: Kanit ExtraBold           # titles, date pills, channel name
+    bg_color: "#0E2A47"
+    caption_color: "#FFFFFF"              # text
+    highlight_color: "#FFD60A"            # accent: date pills, dots, current caption word
+    latest_color: "#E63946"               # the "ล่าสุด" (latest) dot and pill
+    youtube_token: tokens/summed_up.json
+    footage_hint: city skyline at night, phone screen scrolling, documents on desk, abstract data, newspaper printing
+    hashtags: ["#สรุปข่าว", "#สรุปดราม่า", "#สรุปให้ฟัง", "#shorts"]
+    description_footer: "ติดตามสรุปให้ฟัง เพื่อไม่พลาดเรื่องที่คนพูดถึง"

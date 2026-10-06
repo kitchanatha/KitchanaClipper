@@ -94,6 +94,11 @@ def upload(cfg, key, ch, folder):
         slot = next_slot(cfg, key, st.get("publish_times") if kind == "story" else None)
         desc, tags = meta["description"], meta.get("tags", [])
         category = str(st.get("category_id", cfg["youtube"]["category_id"]))
+    elif kind == "news":  # description with the source list, made by news-build
+        nc = cfg.get("news", {})
+        slot = next_slot(cfg, key, nc.get("publish_times"))
+        desc, tags = meta["description"], meta.get("tags", [])
+        category = str(nc.get("category_id", "25"))
     else:
         slot = next_slot(cfg, key)
         tags = list(dict.fromkeys(ch.get("hashtags", []) + meta.get("hashtags", [])))

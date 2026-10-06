@@ -258,6 +258,49 @@ like the others - the existing Shorts channels are not affected.
 SRT and Thai/Chinese line breaking, plus a render test (fake footage/voice, no API keys) that
 leaves sample videos in `output/work/render-test/`.
 
+## 8. สรุปให้ฟัง - Thai news recaps (timeline Shorts with sources)
+
+Channel `summed_up` (สรุปให้ฟัง, @สรุปให้ฟังOfficial) turns a Thai news story or drama into a
+60-90 s timeline Short: a neutral question as the hook, 4-7 timeline cards that slide in as each
+beat is spoken (yellow date pill, Kanit text, "แหล่งข่าว: ..." line), then a red **ล่าสุด** card with
+where things stand now. Word-by-word Thai captions run in the lower third. Not part of the daily run.
+
+### Safety rules (enforced in code - `pipeline/newslib.py` - and repeated in every Claude prompt)
+
+1. **No monarchy / royal family / Section 112 topics, directly or indirectly.** The topic is checked
+   before any research; the research output (sources, timeline, sides, quoted search text) is checked
+   again, and so is the script. Any hit blocks the story. **There is no override.** The word list
+   is deliberately broad (e.g. "ราชินี" used as a nickname, "palace" in a club name also block) -
+   if a safe story is blocked, choose another angle or ask Claude to review the list.
+2. **Two credible outlets per fact.** Research only searches the outlets in `config.yaml` ->
+   `news.credible_outlets`. A timeline event counts as *confirmed* only when **2 different outlets**
+   reported it through URLs the web search actually returned (Claude's own claims are ignored).
+   Unconfirmed events are shown to you but never reach the script. Allegations are phrased as
+   allegations, each side's response is included when reported, and a second Claude pass reviews
+   the script for opinions, verdict-like wording, unsupported claims and guilt-implying hooks.
+3. **No private individuals:** stories centred on a non-public person, a minor or a crime victim
+   are refused.
+4. **No minors' names or faces, no victims' names, no graphic details.**
+5. **No news footage or photos of real people:** visuals are our own timeline graphics plus neutral
+   stock footage (people/faces/crowds/logos are filtered out).
+6. **Every description lists the sources** (outlet, title, date, URL) plus a short disclaimer.
+
+### How it works
+
+```
+python run.py news-research "<topic>"      web research -> news/<folder>/research.json + table
+python run.py news-approve <folder>        you approve the facts (Discord: Approve facts)
+python run.py news-build <folder>          script + safety review + voice + video -> review card
+```
+
+On Discord (computer with `MACHINE_NEWS=yes`): `/news <topic>` posts the researched timeline as a
+fact-review card (each event with date, confirmed / unconfirmed and source links, plus the safety
+check) with **Approve facts / Reject / Edit**. Only after **Approve facts** does it record the voice
+and build the video, which then arrives as the usual video review card (Approve uploads).
+
+Setup: put a Thai voice ID in `config.yaml` -> `summed_up.voice_id`, run `python run.py fonts`
+(Kanit), create the YouTube channel and connect it with `python run.py auth --channel summed_up`.
+
 ## Files
 
 | Path | What |

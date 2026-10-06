@@ -15,3 +15,5 @@ music/*
 # large CJK fonts - run: python run.py fonts
 fonts/NotoSansSC-*.otf
 fonts/NotoSerifSC-*.otf
+# news recaps: recorded voice
+news/*/voice_*

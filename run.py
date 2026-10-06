@@ -14,6 +14,11 @@ Story mode (Candlelit Tales, README section 7):
   python run.py story-build the-monkeys-paw --lang en           narrate + render (asks before paying)
   python run.py story-build the-monkeys-paw --lang en --trailers-only   just the 3 Shorts trailers
   python run.py fonts                                           download all fonts into fonts/
+
+News recaps (สรุปให้ฟัง, README section 8):
+  python run.py news-research "<topic>"                         research + facts table (no voice cost)
+  python run.py news-approve <folder>                           approve the facts
+  python run.py news-build <folder>                             script + safety review + video
 """
 import argparse
 import csv
@@ -45,8 +50,8 @@ def check_ffmpeg():
 
 def channel_keys(cfg, only=None, shorts_only=False):
     keys = list(cfg["channels"])
-    if shorts_only:  # story channels are made with story-build, not the Shorts generator
-        keys = [k for k in keys if cfg["channels"][k].get("type") != "story"]
+    if shorts_only:  # story / news channels have their own builders, not the Shorts generator
+        keys = [k for k in keys if cfg["channels"][k].get("type") not in ("story", "news")]
     if only:
         if only not in keys:
             sys.exit(f"Unknown channel '{only}'. Options: {', '.join(keys)}")
@@ -287,7 +292,8 @@ def cmd_test(cfg, channel):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("command", choices=["generate", "daily", "review", "upload", "auth", "test-video",
-                                        "story-check", "story-prep", "story-build", "fonts"])
+                                        "story-check", "story-prep", "story-build", "fonts",
+                                        "news-research", "news-show", "news-approve", "news-build"])
     ap.add_argument("slug", nargs="?", help="story folder name (story-* commands)")
     ap.add_argument("--lang", help="story languages, e.g. en or en,th,zh (default: all in config)")
     ap.add_argument("--yes", action="store_true", help="story-build: don't ask before paying for audio")
@@ -322,6 +328,24 @@ def main():
     elif a.command == "fonts":
         from pipeline.fonts import download_fonts
         download_fonts(cfg["fonts_dir"], force=a.force)
+    elif a.command.startswith("news-"):
+        if not a.slug:
+            sys.exit(f'Usage: python run.py {a.command} "<topic>"' if a.command == "news-research"
+                     else f"Usage: python run.py {a.command} <news-folder>")
+        from pipeline import news
+        if a.command == "news-research":
+            slug, data = news.research(cfg, a.slug)
+            print()
+            news.print_table(data)
+            print(f"\nNext: check the facts, then  python run.py news-approve {slug}")
+        elif a.command == "news-show":
+            news.print_table(news.read_json(news.news_dir(cfg, a.slug) / "research.json"))
+        elif a.command == "news-approve":
+            news.approve_facts(cfg, a.slug)
+            print(f"Facts approved. Next:  python run.py news-build {a.slug}")
+        else:
+            check_ffmpeg()
+            news.build(cfg, a.slug, force_script=a.force)
     elif a.command.startswith("story-"):
         if not a.slug:
             sys.exit(f"Usage: python run.py {a.command} <story-folder>")

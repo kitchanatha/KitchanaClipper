@@ -23,6 +23,8 @@ FONTS = [
     (GF + "chonburi/Chonburi-Regular.ttf", "Chonburi-Regular.ttf", GF + "chonburi/OFL.txt", "Chonburi"),
     (GF + "notosansthai/NotoSansThai[wdth,wght].ttf", "NotoSansThai-Variable.ttf",
      GF + "notosansthai/OFL.txt", "NotoSansThai"),
+    (GF + "kanit/Kanit-Bold.ttf", "Kanit-Bold.ttf", GF + "kanit/OFL.txt", "Kanit"),
+    (GF + "kanit/Kanit-ExtraBold.ttf", "Kanit-ExtraBold.ttf", GF + "kanit/OFL.txt", "Kanit"),
     (CJK + "Sans/SubsetOTF/SC/NotoSansSC-Regular.otf", "NotoSansSC-Regular.otf",
      CJK + "Sans/LICENSE", "NotoSansSC"),
     (CJK + "Sans/SubsetOTF/SC/NotoSansSC-Bold.otf", "NotoSansSC-Bold.otf",
