@@ -12,7 +12,7 @@ Layout (1080x1920):
 from pathlib import Path
 
 from .assemble import ASS_STYLE_FORMAT, _ts, caption_events, caption_style
-from .newslib import card_width, wrap_card
+from .newslib import CARD_LINE, card_fits, card_width, wrap_card
 from .storylib import ass_color, ass_escape, wrap_text
 
 W, H = 1080, 1920
@@ -71,7 +71,7 @@ def card_events(t0, t1, y, beat, ch, slide=True, latest=False):
         lambda ex, ey: r"\fad(200,0)")
     pill_col = red if latest else accent
     pill_txt_col = white if latest else ass_color(ch["bg_color"])
-    lines = wrap_card(beat["card_text"], 19 if not latest else 22, 2 if not latest else 4)
+    lines = wrap_card(beat["card_text"], CARD_LINE, 2 if not latest else 4)
     h = CARD_H if not latest else 240 + 84 * len(lines)
     ev = [
         # card panel (drawn at 0,0 and moved, so the whole card slides as one)
@@ -165,7 +165,7 @@ def write_news_ass(path, ch, cfg, title, beats, latest, words, total):
 
 def check_card_texts(beats, latest):
     """Card texts that are too long for the layout (empty = fine)."""
-    bad = [b["card_text"] for b in beats if card_width(b["card_text"]) > 40]
+    bad = [b["card_text"] for b in beats if not card_fits(b["card_text"])]
     if card_width(latest.get("card_text", "")) > 90:
         bad.append(latest["card_text"])
     return bad

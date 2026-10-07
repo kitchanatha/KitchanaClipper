@@ -31,26 +31,29 @@ Return ONLY a JSON object, no markdown, with these keys:
 """
 
 
-def ask_claude(cfg, prompt, max_tokens=8000, system=None, timeout=300):
+def ask_claude(cfg, prompt, max_tokens=8000, system=None, timeout=300, effort=None):
     """One Claude API call; returns the reply text.
 
     The model thinks before answering and its thinking counts toward max_tokens, so limits
     are generous (only tokens actually used are billed). A reply that still gets cut off is
-    retried once with twice the room."""
+    retried once with twice the room. effort ("low" / "medium" / "high") limits how much it
+    thinks - lower suits writing tasks."""
     for attempt in range(2):
-        data = _claude_call(cfg, prompt, max_tokens, system, timeout)
+        data = _claude_call(cfg, prompt, max_tokens, system, timeout, effort)
         if data.get("stop_reason") != "max_tokens":
             return "".join(b.get("text", "") for b in data["content"] if b.get("type") == "text")
         max_tokens = min(max_tokens * 2, 32000)
     raise RuntimeError("Claude reply was cut off (max_tokens) twice - try a smaller chunk")
 
 
-def _claude_call(cfg, prompt, max_tokens, system, timeout):
+def _claude_call(cfg, prompt, max_tokens, system, timeout, effort=None):
     body = {
         "model": cfg["claude"]["model"],
         "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}],
     }
+    if effort:
+        body["output_config"] = {"effort": effort}
     if system:
         body["system"] = system
     r = requests.post(

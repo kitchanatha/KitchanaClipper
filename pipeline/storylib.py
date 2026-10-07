@@ -300,9 +300,7 @@ def wrap_spans(text, lang, max_chars):
     lines, ls, le, width = [], None, None, 0
     for s, e in toks:
         tok = text[s:e]
-        if tok.isspace():
-            if ls is not None:
-                width += display_width(" ")
+        if tok.isspace():  # counted once, as the gap before the next word (below)
             continue
         w = display_width(tok)
         if ls is None:

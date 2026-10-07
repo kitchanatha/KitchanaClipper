@@ -74,7 +74,9 @@ separately in a pill - and no names of minors/victims), "narration" (what the na
 status above is "none", describe only the most recent confirmed event.
 - LENGTH BUDGET (Thai characters, spaces included): hook 50-70, each beat narration 90-120, \
 latest narration 110-150. Total narration must land between {c_lo} and {c_hi} characters - \
-scripts outside that range are rejected automatically, so keep every part inside its budget.
+scripts outside that range are rejected automatically, so keep every part inside its budget. \
+Estimate lengths roughly; don't count characters one by one - the code measures them and will \
+tell you the exact number if a draft is off.
 - closing: exactly "{closing}"
 - title: under 70 characters, must contain "สรุป", may include a date. No clickbait.
 - description: 1-2 neutral sentences in Thai (sources are added automatically).
@@ -133,7 +135,7 @@ def _json_in(text, tag=None):
     return json.loads(m.group(0))
 
 
-def claude_web_research(cfg, prompt, domains, max_uses=10, log=print):
+def claude_web_research(cfg, prompt, domains, max_uses=10, log=print, finish_tag="research"):
     """Claude + server-side web search, limited to the credible outlets. Returns
     (final text, verified result URLs, cited texts)."""
     headers = {"x-api-key": env("ANTHROPIC_API_KEY"), "anthropic-version": "2023-06-01",
@@ -141,8 +143,8 @@ def claude_web_research(cfg, prompt, domains, max_uses=10, log=print):
     tools = [{"type": "web_search_20260209", "name": "web_search", "max_uses": max_uses,
               "allowed_domains": list(domains)}]
     messages = [{"role": "user", "content": prompt}]
-    texts, urls, cited = [], [], []
-    for turn in range(6):  # a long search can pause (pause_turn) - continue it
+    texts, urls, cited, so_far, asked = [], [], [], [], False
+    for turn in range(7):  # a long search can pause (pause_turn) - continue it
         for _ in range(3):
             r = requests.post(API, headers=headers, timeout=900, json={
                 "model": cfg["news"].get("model") or cfg["claude"]["model"], "max_tokens": 16000,
@@ -171,11 +173,20 @@ def claude_web_research(cfg, prompt, domains, max_uses=10, log=print):
                         cited.append(c["cited_text"])
         searches = sum(1 for b in data.get("content", []) if b.get("type") == "server_tool_use")
         log(f"  research pass {turn + 1}: {searches} searches, {len(set(urls))} pages found so far")
-        if data.get("stop_reason") == "pause_turn":
-            messages = [messages[0], {"role": "assistant", "content": data["content"]}]
-            continue
         if data.get("stop_reason") == "refusal":
             raise RuntimeError("Claude declined to research this topic.")
+        so_far += data.get("content", [])
+        if data.get("stop_reason") == "pause_turn":  # resend everything said so far, it continues
+            messages = [messages[0], {"role": "assistant", "content": so_far}]
+            continue
+        if finish_tag and f"<{finish_tag}>" not in "".join(texts) and not asked:
+            # finished searching but didn't write the answer: ask for it once
+            asked = True
+            messages = [messages[0], {"role": "assistant", "content": so_far},
+                        {"role": "user", "content": f"Now write the final answer: ONLY the JSON inside "
+                                                    f"<{finish_tag}></{finish_tag}> tags. No more searches."}]
+            so_far = []
+            continue
         return "".join(texts), urls, cited
     raise RuntimeError("Research did not finish after several continuations.")
 
@@ -294,9 +305,11 @@ def write_script(cfg, data, log=print):
     for attempt in range(5):
         prompt = SCRIPT_PROMPT.format(channel=cfg["channels"][nc["channel"]]["name"], s_lo=s_lo,
                                       s_hi=s_hi, c_lo=lo, c_hi=hi, facts=_facts_text(data),
-                                      rules=RULES, b_lo=nc.get("min_beats", 4),
+                                      rules=RULES + "".join(f"\n- Editor's note: {n}"
+                                                            for n in data.get("script_notes", [])),
+                                      b_lo=nc.get("min_beats", 4),
                                       b_hi=nc.get("max_beats", 7), closing=closing, fix=fix)
-        script = _json_in(ask_claude(cfg, prompt, max_tokens=12000, timeout=600))
+        script = _json_in(ask_claude(cfg, prompt, max_tokens=16000, timeout=600, effort="medium"))
         script["closing"] = closing if script.get("closing", "").strip() == closing else script.get("closing", "")
         for b in script.get("beats", []) + [script.get("latest") or {}]:
             b["card_text"] = strip_date(b.get("card_text", ""))  # the date pill shows it already
@@ -306,14 +319,24 @@ def write_script(cfg, data, log=print):
             problems.append(f"narration is {spoken} characters - must be {lo}-{hi} "
                             f"({s_lo}-{s_hi} s spoken)")
         if not problems:
+            notes = "".join(f"\nEditor's rule (also flag any breach): {n}" for n in data.get("script_notes", []))
             review = _json_in(ask_claude(cfg, REVIEW_PROMPT.format(
-                facts=_facts_text(data), script=json.dumps(script, ensure_ascii=False, indent=1)),
+                facts=_facts_text(data) + notes, script=json.dumps(script, ensure_ascii=False, indent=1)),
                 max_tokens=8000, timeout=600))
             if review.get("ok") and not review.get("issues"):
                 return script
             problems = ["safety review: " + i for i in review.get("issues", [])] or ["safety review failed"]
         log(f"  script attempt {attempt + 1} rejected: {'; '.join(problems)[:300]}")
         fix = "Your previous draft was rejected for: " + "; ".join(problems) + ". Fix all of these."
+        if spoken > hi:  # too long: show the measured parts and ask for a trim of this draft
+            sizes = ", ".join(f"{pid} {len(t)}" for pid, t in narration_parts(script))
+            fix += (f"\nMeasured characters per part: {sizes} (total {spoken}, maximum {hi}). "
+                    f"Shorten THIS draft by at least {spoken - hi + 40} characters - drop the least "
+                    f"important details or merge two beats; keep everything else as it is:\n"
+                    + json.dumps(script, ensure_ascii=False))
+        elif script.get("beats"):  # revise this draft instead of starting over (new slips each time)
+            fix += ("\nRevise THIS draft with the smallest changes that fix the points above; keep "
+                    "everything else (and the total length) as it is:\n" + json.dumps(script, ensure_ascii=False))
     raise SystemExit("Could not write a script that passes the safety checks:\n  - " + "\n  - ".join(problems))
 
 

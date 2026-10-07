@@ -142,10 +142,10 @@ class OnlyConfirmedInScript(unittest.TestCase):
         s = copy.deepcopy(self.script)
         s["beats"] = s["beats"][:3]
         s["title"] = "ดราม่าค่ารถ"
-        s["beats"][0]["card_text"] = "ก" * 41
+        s["beats"][0]["card_text"] = "ก" * 50
         s["hook"] = "ในหลวงเกี่ยวข้องไหม"
         p = " | ".join(N.script_problems(s, self.r, closing=self.script["closing"]))
-        for needle in ("4-7 timeline beats", "สรุป", "over 40", "monarchy"):
+        for needle in ("4-7 timeline beats", "สรุป", "too long for the card", "monarchy"):
             self.assertIn(needle, p)
 
 
@@ -162,6 +162,11 @@ class CardText(unittest.TestCase):
             pos += len(w)
             bounds.add(pos)
         self.assertIn(len(lines[0]), bounds)
+
+    def test_card_fits_two_lines(self):
+        self.assertTrue(N.card_fits("งบกลาง 558.7 ล้านบาท รอบแรก 60,971 ครัวเรือน"))   # 41 chars, 2 lines
+        self.assertTrue(N.card_fits("กทม. ประกาศเขตภัยครบ 50 เขต"))
+        self.assertFalse(N.card_fits("ครม. อนุมัติงบกลางกว่าสี่พันล้านบาทเพื่อเยียวยาผู้ประสบอุทกภัยทั่วประเทศทันที"))
 
     def test_strip_leading_date(self):
         self.assertEqual(N.strip_date("26 ก.ย. กทม. ประกาศเขตภัยครบ 50 เขต"), "กทม. ประกาศเขตภัยครบ 50 เขต")

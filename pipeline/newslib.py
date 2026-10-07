@@ -193,8 +193,9 @@ def script_problems(script, research, min_beats=4, max_beats=7, closing=None):
             problems.append(f"beat '{b.get('card_text', '')[:20]}' cites no event")
         elif not used <= ids:
             problems.append(f"beat uses unconfirmed or unknown events: {sorted(used - ids)}")
-        if card_width(b.get("card_text", "")) > 40:
-            problems.append(f"card text over 40 characters: {b.get('card_text')}")
+        if not card_fits(b.get("card_text", "")):
+            problems.append(f"card text too long for the card ({card_width(b.get('card_text', ''))} "
+                            f"characters, keep it about 40): {b.get('card_text')}")
     title = script.get("title", "")
     if "สรุป" not in title or len(title) > 70:
         problems.append("title must contain 'สรุป' and be under 70 characters")
@@ -215,6 +216,17 @@ def script_problems(script, research, min_beats=4, max_beats=7, closing=None):
 def card_width(text):
     """Visible length of Thai card text (vowel/tone marks above or below don't count)."""
     return sum(0 if unicodedata.category(c) in ("Mn", "Me") else 1 for c in str(text or ""))
+
+
+CARD_LINE = 22  # Thai characters per card line at the card font size
+
+
+def card_fits(text, max_lines=2):
+    """True if the card text fits the card: at most max_lines lines of CARD_LINE characters
+    (the spec's '~40 characters'), broken between words."""
+    from .storylib import wrap_text
+    lines = wrap_text(str(text or "").strip(), "th", CARD_LINE)
+    return len(lines) <= max_lines and all(card_width(x) <= CARD_LINE for x in lines)
 
 
 def wrap_card(text, max_chars=20, max_lines=2):
