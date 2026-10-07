@@ -341,7 +341,7 @@ async def do_upload(inter):
                 continue
             try:
                 url, slot = await asyncio.to_thread(core.upload_one, cfg, k, p)
-                lines.append(f"✅ {upload_note(slot)} {url}")
+                lines.append(f"✅ {upload_note(slot)} {url}" + upload_warnings(k, p.name))
             except BaseException as e:
                 lines.append(f"❌ {p.name}: {str(e)[:200]}")
     await inter.followup.send("\n".join(lines) or "Nothing approved to upload.")

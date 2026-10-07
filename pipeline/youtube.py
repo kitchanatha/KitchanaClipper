@@ -14,7 +14,9 @@ YT_LANG = {"en": "en", "th": "th", "zh": "zh-Hans"}
 
 
 def _scopes(ch):
-    return STORY_SCOPES if ch.get("type") == "story" else SCOPES
+    # news: force-ssl lets the second of a short/full pair add its link to the first one's
+    # description. A news token signed in before that keeps working (see _creds).
+    return STORY_SCOPES if ch.get("type") in ("story", "news") else SCOPES
 CLIENT_SECRET = ROOT / "client_secret.json"
 SCHEDULE = ROOT / "data" / "schedule.json"
 
@@ -26,8 +28,11 @@ def _creds(ch, interactive=False):
 
     token = ROOT / ch["youtube_token"]
     creds = None
-    if token.exists():
-        creds = Credentials.from_authorized_user_file(str(token), _scopes(ch))
+    if token.exists():  # news: use the scopes the saved sign-in actually has
+        creds = Credentials.from_authorized_user_file(
+            str(token), None if ch.get("type") == "news" else _scopes(ch))
+    if interactive and creds and not set(_scopes(ch)) <= set(creds.scopes or []):
+        creds = None  # auth again: this sign-in lacks a permission the channel now uses
     if creds and creds.expired and creds.refresh_token:
         creds.refresh(Request())
     if not creds or not creds.valid:
@@ -88,6 +93,7 @@ def upload(cfg, key, ch, folder):
     folder = Path(folder)
     meta = json.loads((folder / "meta.json").read_text(encoding="utf-8"))
     kind = meta.get("kind", "short")
+    sibling = None
     lang = YT_LANG.get(ch.get("language", "en"), ch.get("language", "en"))
     if kind in ("story", "trailer"):  # description (with credits) and tags made by story-build
         st = cfg.get("story", {})
@@ -99,6 +105,9 @@ def upload(cfg, key, ch, folder):
         slot = next_slot(cfg, key, nc.get("publish_times"))
         desc, tags = meta["description"], meta.get("tags", [])
         category = str(nc.get("category_id", "25"))
+        sibling = _news_sibling(cfg, key, meta)
+        if sibling:  # the other version is already up: link to it at the top
+            desc = _pair_line(meta.get("variant", "full"), sibling[1]["video_id"]) + "\n\n" + desc
     else:
         slot = next_slot(cfg, key)
         tags = list(dict.fromkeys(ch.get("hashtags", []) + meta.get("hashtags", [])))
@@ -133,15 +142,73 @@ def upload(cfg, key, ch, folder):
     while resp is None:
         _, resp = req.next_chunk()
     vid = resp["id"]
+    meta["video_id"] = vid
+    warnings = []
     if kind == "story":
         warnings = _story_extras(yt, vid, folder, meta, lang)
-        if warnings:  # the video is up - report, don't fail (a retry would upload it twice)
-            meta["upload_warnings"] = warnings
-            (folder / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2),
-                                              encoding="utf-8")
-            for w in warnings:
-                print(f"WARNING: {w}")
+    elif kind == "news" and sibling:
+        warnings = _link_sibling(yt, _creds(ch).scopes, sibling, meta.get("variant", "full"), vid)
+    # the video is up - report problems, don't fail (a retry would upload it twice)
+    meta["upload_warnings"] = warnings
+    (folder / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2),
+                                      encoding="utf-8")
+    for w in warnings:
+        print(f"WARNING: {w}")
     return vid, slot
+
+
+PAIR_TEXT = {"full": "▶ ดูฉบับเต็ม: ", "short": "▶ ดูฉบับสั้น: "}
+
+
+def _pair_line(this_variant, other_id):
+    """Description line pointing from this version to the other one."""
+    other = "short" if this_variant == "full" else "full"
+    return PAIR_TEXT[other] + f"https://youtu.be/{other_id}"
+
+
+def _news_sibling(cfg, key, meta):
+    """The other version (short / full) of the same news topic, if it is already uploaded:
+    (folder, meta) or None. Videos built before short versions existed count as full."""
+    variant = meta.get("variant", "full")
+    root = Path(cfg["output_dir"]) / "uploaded" / key
+    for f in sorted(root.glob("*/meta.json")) if root.exists() else []:
+        try:
+            m = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if (m.get("kind") == "news" and m.get("news") == meta.get("news") and m.get("video_id")
+                and m.get("variant", "full") != variant):
+            return f.parent, m
+    return None
+
+
+def _link_sibling(yt, scopes, sibling, new_variant, new_id):
+    """Adds the new video's link to the top of the already-uploaded other version.
+    Returns warnings (with the line to paste by hand if editing isn't possible)."""
+    folder, m = sibling
+    other_variant = m.get("variant", "full")
+    line = _pair_line(other_variant, new_id)
+    manual = (f"add this line to the top of the description of \"{m['title']}\" in YouTube "
+              f"Studio: {line}")
+    if "https://www.googleapis.com/auth/youtube.force-ssl" not in (scopes or []):
+        return ["Can't edit the other version yet (this channel's sign-in is from before) - run "
+                "`python run.py auth --channel <key>` once, and for now " + manual]
+    try:
+        items = yt.videos().list(part="snippet", id=m["video_id"]).execute().get("items", [])
+        if not items:
+            return [f"Other version not found on YouTube - {manual}"]
+        snip = items[0]["snippet"]
+        if line not in snip.get("description", ""):
+            snip["description"] = (line + "\n\n" + snip.get("description", ""))[:4900]
+            yt.videos().update(part="snippet", body={"id": m["video_id"], "snippet": {
+                k: snip[k] for k in ("title", "description", "tags", "categoryId",
+                                     "defaultLanguage", "defaultAudioLanguage") if k in snip}}).execute()
+        m["paired_with"] = new_id
+        (folder / "meta.json").write_text(json.dumps(m, ensure_ascii=False, indent=2),
+                                          encoding="utf-8")
+        return []
+    except Exception as e:  # noqa: BLE001 - the new video is up either way
+        return [f"Couldn't edit the other version ({str(e)[:160]}) - {manual}"]
 
 
 def _story_extras(yt, vid, folder, meta, lang):
