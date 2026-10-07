@@ -198,7 +198,7 @@ channels:
     type: news
     language: th
     handle: "@สรุปให้ฟังOfficial"
-    voice_id: PASTE_ELEVENLABS_VOICE_ID   # clear, neutral Thai news voice
+    voice_id: tAV9ucNkXgK2k9TLxWkM        # Thai news voice (Voice Library)
     font: Kanit                           # card text + captions (Kanit Bold)
     title_font: Kanit ExtraBold           # titles, date pills, channel name
     bg_color: "#0E2A47"
