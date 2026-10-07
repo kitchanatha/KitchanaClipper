@@ -34,7 +34,10 @@ if not MY_CHANNELS:
 # Story mode (Candlelit Tales) runs on the computer with MACHINE_STORIES=yes
 STORY_MODE = os.environ.get("MACHINE_STORIES", "").strip().lower() in ("1", "yes", "true", "on")
 STORY_KEYS = list(dict.fromkeys(cfg.get("story", {}).get("channels", {}).values())) if STORY_MODE else []
-REVIEW_KEYS = MY_CHANNELS + [k for k in STORY_KEYS if k not in MY_CHANNELS]
+# News recaps (สรุปให้ฟัง) run on the computer with MACHINE_NEWS=yes
+NEWS_MODE = os.environ.get("MACHINE_NEWS", "").strip().lower() in ("1", "yes", "true", "on")
+NEWS_KEYS = [cfg["news"]["channel"]] if NEWS_MODE and cfg.get("news") else []
+REVIEW_KEYS = list(dict.fromkeys(MY_CHANNELS + STORY_KEYS + NEWS_KEYS))
 
 STATE = ROOT / "data" / f"bot_state_{MACHINE}.json"
 AUTO = cfg.get("automation", {})
