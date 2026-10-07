@@ -259,6 +259,37 @@ def thai_date(iso, with_year=False):
     return out + f" {(y + 543) % 100:02d}" if with_year else out
 
 
+# Thai news shorthand -> what a newsreader says. config.yaml news.pronounce adds / overrides.
+SPOKEN = {
+    "ม.ค.": "มกราคม", "ก.พ.": "กุมภาพันธ์", "มี.ค.": "มีนาคม", "เม.ย.": "เมษายน", "พ.ค.": "พฤษภาคม",
+    "มิ.ย.": "มิถุนายน", "ก.ค.": "กรกฎาคม", "ส.ค.": "สิงหาคม", "ก.ย.": "กันยายน", "ต.ค.": "ตุลาคม",
+    "พ.ย.": "พฤศจิกายน", "ธ.ค.": "ธันวาคม",
+    "กทม.": "กรุงเทพมหานคร", "กรุงเทพฯ": "กรุงเทพ", "ครม.": "คณะรัฐมนตรี", "ปภ.": "ปอภอ",
+    "สทนช.": "สอทอนอชอ", "สปสช.": "สอปอสอชอ", "ส.ส.": "สอสอ", "ส.ว.": "สอวอ", "สว.": "สอวอ",
+    "พ.ร.บ.": "พอรอบอ", "รมว.": "รัฐมนตรีว่าการ", "รมช.": "รัฐมนตรีช่วยว่าการ", "ผู้ว่าฯ": "ผู้ว่า",
+    "นายกฯ": "นายก", "อปท.": "องค์กรปกครองส่วนท้องถิ่น", "สภ.": "สถานีตำรวจภูธร",
+    "ลบ.ม.": "ลูกบาศก์เมตร", "ตร.กม.": "ตารางกิโลเมตร", "ซม.": "เซนติเมตร", "มม.": "มิลลิเมตร",
+    "กม.": "กิโลเมตร", "ชม.": "ชั่วโมง", "%": " เปอร์เซ็นต์",
+    "Thai PBS": "ไทยพีบีเอส", "Thairath": "ไทยรัฐ", "Khaosod": "ข่าวสด", "Matichon": "มติชน",
+    "Bangkok Post": "บางกอกโพสต์", "The Standard": "เดอะสแตนดาร์ด", "Prachachat": "ประชาชาติ",
+    "PPTV": "พีพีทีวี", "JICC": "เจไอซีซี", "DGA": "ดีจีเอ",
+}
+_PLACE = re.compile(r"(?<![ก-๙])(อ|จ|ต)\.(?=\s*[ก-๙])")  # อ.บางบาล / จ.อยุธยา / ต.
+_RANGE = re.compile(r"(\d)\s*[–-]\s*(\d)")
+
+
+def speakable(text, extra=None):
+    """News text as it should be spoken: expand abbreviations, month names, units, ranges.
+    Longer keys first, so 'ลบ.ม.' wins over 'ม.'."""
+    table = {**SPOKEN, **(extra or {})}
+    t = str(text or "")
+    for k in sorted(table, key=len, reverse=True):
+        t = t.replace(k, table[k])
+    t = _PLACE.sub(lambda m: {"อ": "อำเภอ", "จ": "จังหวัด", "ต": "ตำบล"}[m.group(1)], t)
+    t = _RANGE.sub(r"\1 ถึง \2", t)
+    return re.sub(r"[ \t]{2,}", " ", t)
+
+
 def sources_block(research, used_urls=None):
     """Description source list: outlet - title - date - URL (credible, verified sources)."""
     lines = []

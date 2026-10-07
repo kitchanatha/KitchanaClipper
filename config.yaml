@@ -41,6 +41,9 @@ news:                       # Thai news recaps (สรุปให้ฟัง) 
   closing_line: "ติดตามสรุปให้ฟัง เพื่อไม่พลาดเรื่องที่คนพูดถึง"
   disclaimer: "สรุปจากรายงานของสื่อที่ระบุด้านบน ข้อกล่าวหาเป็นเพียงข้อกล่าวหาจนกว่าจะมีคำตัดสิน · เสียงบรรยายโดย AI"
   darken: 0.55
+  model_id: eleven_multilingual_v2   # ElevenLabs model for the news voice (eleven_v4 / eleven_v3 read Thai better)
+  pronounce:                # extra words the voice says wrong: "as written": "as spoken" (built-in list in newslib.py)
+    "ศปภ.": "สอปอภอ"
   category_id: "25"         # News & Politics
   publish_times: ["12:00", "18:00"]
   footage_exclude: [face, portrait, man, woman, people, crowd, protest, police, flag, logo,

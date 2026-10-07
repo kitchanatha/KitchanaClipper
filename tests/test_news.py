@@ -168,6 +168,14 @@ class CardText(unittest.TestCase):
         self.assertTrue(N.card_fits("กทม. ประกาศเขตภัยครบ 50 เขต"))
         self.assertFalse(N.card_fits("ครม. อนุมัติงบกลางกว่าสี่พันล้านบาทเพื่อเยียวยาผู้ประสบอุทกภัยทั่วประเทศทันที"))
 
+    def test_speakable_thai(self):
+        t = N.speakable("ล่าสุด 6 ต.ค. ปภ. รายงาน ที่ อ.บางบาล จ.อยุธยา น้ำสูง 28.5 ซม. ฝน 10–13 ต.ค. ระบาย 2,500 ลบ.ม./วินาที")
+        for want in ("6 ตุลาคม", "ปอภอ", "อำเภอบางบาล", "จังหวัดอยุธยา", "เซนติเมตร", "10 ถึง 13 ตุลาคม",
+                     "ลูกบาศก์เมตร"):
+            self.assertIn(want, t)
+        self.assertNotIn("ต.ค.", t)
+        self.assertEqual(N.speakable("ศปภ. แถลง", {"ศปภ.": "สอปอภอ"}), "สอปอภอ แถลง")   # config words win
+
     def test_strip_leading_date(self):
         self.assertEqual(N.strip_date("26 ก.ย. กทม. ประกาศเขตภัยครบ 50 เขต"), "กทม. ประกาศเขตภัยครบ 50 เขต")
         self.assertEqual(N.strip_date("วันที่ 2 ต.ค. 69 เปิดลงทะเบียน"), "เปิดลงทะเบียน")

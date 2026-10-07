@@ -18,7 +18,7 @@ import requests
 
 from .common import ROOT, env, slugify
 from .newslib import (apply_confirmation, confirmed_facts, monarchy_hits, safety_problems,
-                      script_problems, sources_block, strip_date, thai_date)
+                      script_problems, sources_block, speakable, strip_date, thai_date)
 
 API = "https://api.anthropic.com/v1/messages"
 BKK = timezone(timedelta(hours=7))
@@ -314,7 +314,7 @@ def write_script(cfg, data, log=print):
         for b in script.get("beats", []) + [script.get("latest") or {}]:
             b["card_text"] = strip_date(b.get("card_text", ""))  # the date pill shows it already
         problems = script_problems(script, data, nc.get("min_beats", 4), nc.get("max_beats", 7), closing)
-        spoken = sum(len(t) for _, t in narration_parts(script)) if not problems else 0
+        spoken = sum(len(t) for _, t in spoken_parts(cfg, script)) if not problems else 0
         if spoken and not lo <= spoken <= hi:
             problems.append(f"narration is {spoken} characters - must be {lo}-{hi} "
                             f"({s_lo}-{s_hi} s spoken)")
@@ -329,7 +329,7 @@ def write_script(cfg, data, log=print):
         log(f"  script attempt {attempt + 1} rejected: {'; '.join(problems)[:300]}")
         fix = "Your previous draft was rejected for: " + "; ".join(problems) + ". Fix all of these."
         if spoken > hi:  # too long: show the measured parts and ask for a trim of this draft
-            sizes = ", ".join(f"{pid} {len(t)}" for pid, t in narration_parts(script))
+            sizes = ", ".join(f"{pid} {len(t)}" for pid, t in spoken_parts(cfg, script))
             fix += (f"\nMeasured characters per part: {sizes} (total {spoken}, maximum {hi}). "
                     f"Shorten THIS draft by at least {spoken - hi + 40} characters - drop the least "
                     f"important details or merge two beats; keep everything else as it is:\n"
@@ -338,6 +338,12 @@ def write_script(cfg, data, log=print):
             fix += ("\nRevise THIS draft with the smallest changes that fix the points above; keep "
                     "everything else (and the total length) as it is:\n" + json.dumps(script, ensure_ascii=False))
     raise SystemExit("Could not write a script that passes the safety checks:\n  - " + "\n  - ".join(problems))
+
+
+def spoken_parts(cfg, script):
+    """narration_parts as the voice will say them (abbreviations / units / ranges expanded)."""
+    extra = (cfg.get("news") or {}).get("pronounce") or {}
+    return [(pid, speakable(t, extra)) for pid, t in narration_parts(script)]
 
 
 def narration_parts(script):
@@ -381,9 +387,9 @@ def build(cfg, slug, force_script=False, log=print):
         raise SystemExit("script.json no longer passes the checks - rebuild with --force")
 
     # ---- voice (cached: same text + voice = no new credits)
-    parts = narration_parts(script)
+    parts = spoken_parts(cfg, script)  # what the voice says (and what the captions show)
     text = " ".join(t for _, t in parts)
-    model = cfg["elevenlabs"]["model_id"]
+    model = nc.get("model_id") or cfg["elevenlabs"]["model_id"]
     settings = {"stability": 0.5, "similarity_boost": 0.8, "style": 0.2}
     k = hashlib.sha1(json.dumps([voice, model, settings, text], ensure_ascii=False).encode()).hexdigest()[:12]
     mp3, alf = d / f"voice_{k}.mp3", d / f"voice_{k}.json"
