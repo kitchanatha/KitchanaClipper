@@ -22,7 +22,7 @@ from .newslib import (apply_confirmation, confirmed_facts, monarchy_hits, safety
 
 API = "https://api.anthropic.com/v1/messages"
 BKK = timezone(timedelta(hours=7))
-CHARS_PER_S = 12  # Thai narration speed measured on the สรุปให้ฟัง voice (665 chars = 54 s)
+CHARS_PER_S = 10  # Thai narration speed of the สรุปให้ฟัง voice (Kanya on eleven_v4: 1033 spoken chars = 103 s)
 
 RULES = """Hard rules - follow every one:
 1. Nothing about the Thai monarchy, the royal family or Section 112, directly or indirectly. If the
@@ -301,7 +301,7 @@ def write_script(cfg, data, log=print):
     closing = nc["closing_line"]
     s_lo, s_hi = nc.get("script_seconds", [60, 90])
     fix, problems = "", []
-    lo, hi = s_lo * (CHARS_PER_S - 1), s_hi * CHARS_PER_S - 60  # this voice: ~12 Thai chars / s
+    lo, hi = s_lo * (CHARS_PER_S - 1), s_hi * CHARS_PER_S - 60  # spoken chars for 60-90 s
     for attempt in range(5):
         prompt = SCRIPT_PROMPT.format(channel=cfg["channels"][nc["channel"]]["name"], s_lo=s_lo,
                                       s_hi=s_hi, c_lo=lo, c_hi=hi, facts=_facts_text(data),
