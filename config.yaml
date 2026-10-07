@@ -41,7 +41,7 @@ news:                       # Thai news recaps (สรุปให้ฟัง) 
   closing_line: "ติดตามสรุปให้ฟัง เพื่อไม่พลาดเรื่องที่คนพูดถึง"
   disclaimer: "สรุปจากรายงานของสื่อที่ระบุด้านบน ข้อกล่าวหาเป็นเพียงข้อกล่าวหาจนกว่าจะมีคำตัดสิน · เสียงบรรยายโดย AI"
   darken: 0.55
-  model_id: eleven_multilingual_v2   # ElevenLabs model for the news voice (eleven_v4 / eleven_v3 read Thai better)
+  model_id: eleven_v4       # ElevenLabs model for the news voice (reads Thai better than multilingual_v2)
   pronounce:                # extra words the voice says wrong: "as written": "as spoken" (built-in list in newslib.py)
     "ศปภ.": "สอปอภอ"
   category_id: "25"         # News & Politics
@@ -204,7 +204,7 @@ channels:
     type: news
     language: th
     handle: "@สรุปให้ฟังOfficial"
-    voice_id: tAV9ucNkXgK2k9TLxWkM        # Thai news voice (Voice Library)
+    voice_id: B4NdgwdU97lHqA8Udh2D        # Kanya - warm, calm Thai narrator (Voice Library)
     font: Kanit                           # card text + captions (Kanit Bold)
     title_font: Kanit ExtraBold           # titles, date pills, channel name
     bg_color: "#0E2A47"
