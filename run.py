@@ -19,6 +19,7 @@ News recaps (สรุปให้ฟัง, README section 8):
   python run.py news-research "<topic>"                         research + facts table (no voice cost)
   python run.py news-approve <folder>                           approve the facts
   python run.py news-build <folder>                             script + safety review + video
+  python run.py news-build <folder> --short                     a 60-85 s short version as well
 """
 import argparse
 import csv
@@ -303,6 +304,8 @@ def main():
     ap.add_argument("--trailers-only", action="store_true",
                     help="story-build: only the 3 Shorts trailers per language (cheap test)")
     ap.add_argument("--trailer", help="story-build: only these trailer numbers, e.g. 2,3")
+    ap.add_argument("--short", action="store_true",
+                    help="news-build: a separate short version (news.short_seconds) next to the full one")
     ap.add_argument("--channel", help="channel key from config.yaml (default: all)")
     ap.add_argument("--count", type=int, default=1)
     ap.add_argument("--script", help="JSON file with your own script (generate only, skips Claude)")
@@ -345,7 +348,7 @@ def main():
             print(f"Facts approved. Next:  python run.py news-build {a.slug}")
         else:
             check_ffmpeg()
-            news.build(cfg, a.slug, force_script=a.force)
+            news.build(cfg, a.slug, force_script=a.force, short=a.short)
     elif a.command.startswith("story-"):
         if not a.slug:
             sys.exit(f"Usage: python run.py {a.command} <story-folder>")

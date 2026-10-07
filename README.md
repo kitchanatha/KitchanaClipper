@@ -291,6 +291,7 @@ where things stand now. Word-by-word Thai captions run in the lower third. Not p
 python run.py news-research "<topic>"      web research -> news/<folder>/research.json + table
 python run.py news-approve <folder>        you approve the facts (Discord: Approve facts)
 python run.py news-build <folder>          script + safety review + voice + video -> review card
+python run.py news-build <folder> --short  also a short version (60-85 s) in review/summed_up/<folder>-short
 ```
 
 On Discord (computer with `MACHINE_NEWS=yes`): the **News** panel button (or `/news <topic>`) posts

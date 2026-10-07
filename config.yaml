@@ -37,6 +37,7 @@ news:                       # Thai news recaps (สรุปให้ฟัง) 
   min_beats: 4
   max_beats: 7
   script_seconds: [60, 90]
+  short_seconds: [60, 85]   # news-build --short: a shorter version next to the full one
   max_searches: 10          # web searches per research run
   closing_line: "ติดตามสรุปให้ฟัง เพื่อไม่พลาดเรื่องที่คนพูดถึง"
   disclaimer: "สรุปจากรายงานของสื่อที่ระบุด้านบน ข้อกล่าวหาเป็นเพียงข้อกล่าวหาจนกว่าจะมีคำตัดสิน · เสียงบรรยายโดย AI"

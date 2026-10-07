@@ -295,14 +295,14 @@ def _facts_text(data):
         "status_now_th": f["status_now_th"] or "none"}, ensure_ascii=False, indent=1)
 
 
-def write_script(cfg, data, log=print):
+def write_script(cfg, data, log=print, seconds=None):
     from .script import ask_claude
     nc = cfg["news"]
     closing = nc["closing_line"]
-    s_lo, s_hi = nc.get("script_seconds", [60, 90])
+    s_lo, s_hi = seconds or nc.get("script_seconds", [60, 90])
     fix, problems = "", []
     lo, hi = s_lo * (CHARS_PER_S - 1), s_hi * CHARS_PER_S - 60  # spoken chars for 60-90 s
-    for attempt in range(5):
+    for attempt in range(8):  # drafts cost only Claude calls - the voice is recorded once
         prompt = SCRIPT_PROMPT.format(channel=cfg["channels"][nc["channel"]]["name"], s_lo=s_lo,
                                       s_hi=s_hi, c_lo=lo, c_hi=hi, facts=_facts_text(data),
                                       rules=RULES + "".join(f"\n- Editor's note: {n}"
@@ -357,7 +357,9 @@ def narration_parts(script):
 
 # ---------------------------------------------------------------- build
 
-def build(cfg, slug, force_script=False, log=print):
+def build(cfg, slug, force_script=False, log=print, short=False):
+    """short=True: a separate, shorter script (news.short_seconds) -> review/<channel>/<slug>-short,
+    next to the full version."""
     import run as core
     from .assemble import duration, finish_video, make_background
     from .footage import get_footage
@@ -378,10 +380,12 @@ def build(cfg, slug, force_script=False, log=print):
         raise SystemExit("The facts are not approved yet (Discord 'Approve facts' or news-approve).")
     voice = check_voice_id(ch)
 
-    sf = d / "script.json"
+    sf = d / ("script_short.json" if short else "script.json")
+    seconds = nc.get("short_seconds", [60, 85]) if short else None
+    name = f"{slug}-short" if short else slug
     if force_script or not sf.exists():
         log("Writing the script + safety review...")
-        write_json(sf, write_script(cfg, data, log))
+        write_json(sf, write_script(cfg, data, log, seconds))
     script = read_json(sf)
     if script_problems(script, data, nc.get("min_beats", 4), nc.get("max_beats", 7), nc["closing_line"]):
         raise SystemExit("script.json no longer passes the checks - rebuild with --force")
@@ -421,8 +425,8 @@ def build(cfg, slug, force_script=False, log=print):
         raise SystemExit("Card text too long for the layout: " + " | ".join(bad))
 
     # ---- footage + render
-    out_dir = core.dirs(cfg)["review"] / key / slug
-    work = core.dirs(cfg)["work"] / f"news-{slug}"
+    out_dir = core.dirs(cfg)["review"] / key / name
+    work = core.dirs(cfg)["work"] / f"news-{name}"
     shutil.rmtree(out_dir, ignore_errors=True)
     out_dir.mkdir(parents=True)
     work.mkdir(parents=True, exist_ok=True)
@@ -450,7 +454,8 @@ def build(cfg, slug, force_script=False, log=print):
         "แหล่งข่าว:\n" + sources_block(data, set(used)),
         nc.get("disclaimer", ""), ch.get("description_footer", ""),
         " ".join(dict.fromkeys(ch.get("hashtags", []) + script.get("hashtags", [])))] if x)
-    meta = {"kind": "news", "news": slug, "channel": key, "channel_name": ch["name"],
+    meta = {"kind": "news", "news": slug, "variant": "short" if short else "full",
+            "channel": key, "channel_name": ch["name"],
             "title": script["title"][:100], "script": " ".join(t for _, t in parts),
             "description": desc, "tags": [h.lstrip("#") for h in ch.get("hashtags", []) + script.get("hashtags", [])],
             "length_sec": round(total, 1), "sources": used, "pexels_ids": ids,

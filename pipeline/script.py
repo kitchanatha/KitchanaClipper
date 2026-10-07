@@ -1,6 +1,7 @@
 """Step 1 - write a script with the Claude API."""
 import json
 import re
+import time
 
 import requests
 
@@ -56,19 +57,25 @@ def _claude_call(cfg, prompt, max_tokens, system, timeout, effort=None):
         body["output_config"] = {"effort": effort}
     if system:
         body["system"] = system
-    r = requests.post(
-        API,
-        headers={
-            "x-api-key": env("ANTHROPIC_API_KEY"),
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        },
-        json=body,
-        timeout=timeout,
-    )
-    if r.status_code != 200:
-        raise RuntimeError(f"Claude API error {r.status_code}: {r.text[:500]}")
-    return r.json()
+    headers = {
+        "x-api-key": env("ANTHROPIC_API_KEY"),
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    for attempt in range(3):  # a stalled / dropped connection or an overloaded API: try again
+        try:
+            r = requests.post(API, headers=headers, json=body, timeout=(15, timeout))
+        except requests.RequestException:
+            if attempt == 2:
+                raise
+            time.sleep(10 * (attempt + 1))
+            continue
+        if r.status_code in (429, 500, 502, 503, 529) and attempt < 2:
+            time.sleep(10 * (attempt + 1))
+            continue
+        if r.status_code != 200:
+            raise RuntimeError(f"Claude API error {r.status_code}: {r.text[:500]}")
+        return r.json()
 
 
 def write_script(cfg, ch, recent_topics):
