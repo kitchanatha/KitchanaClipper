@@ -213,6 +213,8 @@ async def on_interaction(inter: discord.Interaction):
     cid = (inter.data or {}).get("custom_id", "") if inter.type == discord.InteractionType.component else ""
     if cid.startswith("cp:"):
         return await handle_panel(inter, cid)
+    if cid.startswith("nf:"):
+        return await handle_news_card(inter, cid)
     if not cid.startswith("fp:"):
         return
     _, action, rest = cid.split(":", 2)
@@ -375,7 +377,8 @@ def panel_view():
         ("Pause daily run", "cp:pause", discord.ButtonStyle.secondary, 1),
         ("Resume daily run", "cp:resume", discord.ButtonStyle.secondary, 1),
         ("Set daily time", "cp:settime", discord.ButtonStyle.secondary, 1),
-    ] + ([("Stories", "cp:stories", discord.ButtonStyle.primary, 1)] if STORY_MODE else []):
+    ] + ([("Stories", "cp:stories", discord.ButtonStyle.primary, 1)] if STORY_MODE else []) \
+      + ([("News", "cp:news", discord.ButtonStyle.primary, 1)] if NEWS_MODE else []):
         v.add_item(discord.ui.Button(label=label, custom_id=cid, style=style, row=row))
     return v
 
@@ -439,6 +442,10 @@ async def handle_panel(inter, cid):
         await inter.response.send_modal(TimeModal())
     elif cid == "cp:stories":
         await open_stories(inter)
+    elif cid == "cp:news":
+        if not NEWS_MODE:
+            return await inter.response.send_message("News mode is off on this computer.", ephemeral=True)
+        await inter.response.send_modal(NewsTopicModal())
 
 
 # ---------------- story mode (Candlelit Tales) ----------------
@@ -610,6 +617,184 @@ def story_langs_arg(languages):
     return None if not languages or languages.value == "all" else languages.value
 
 
+# ---------------- news recaps (สรุปให้ฟัง) ----------------
+
+def news_link(url, outlet):
+    return f"[{outlet}]({url})"
+
+
+def fact_embeds(data):
+    """The researched timeline as Discord embeds (split to stay under Discord's size limits)."""
+    from pipeline.newslib import domain_of, outlet_for, thai_date
+    credible = cfg["news"]["credible_outlets"]
+    sc = data.get("safety_check") or {}
+    problems = data.get("safety_problems") or []
+    head = discord.Embed(
+        title=("⛔ BLOCKED - " if problems else "ตรวจข้อเท็จจริง: ") + str(data.get("topic", ""))[:200],
+        color=0xE63946 if problems else 0xFFD60A,
+        description=(
+            f"**Safety check** - monarchy: {'YES' if sc.get('monarchy') else 'no'} · "
+            f"private person: {'YES' if sc.get('private_person') else 'no'} · "
+            f"minor / victim: {'YES' if sc.get('minor_or_victim') else 'no'}\n"
+            f"{str(sc.get('notes', ''))[:600]}\n"
+            + ("".join(f"\n⛔ **{x}**" for x in problems))
+            + f"\n\n✅ confirmed = 2+ different outlets (only these can be used) · ⚠️ = unconfirmed, left out")[:4000])
+    embeds, cur, size = [head], None, 0
+    for e in data.get("timeline", []):
+        when = thai_date(e.get("date"), True) + (f" {e['time_if_known']}" if e.get("time_if_known") else "")
+        name = f"{'✅' if e.get('confirmed') else '⚠️'} [{e.get('id')}] {when}"
+        urls = e.get("source_urls") or []
+        srcs = " · ".join(news_link(u, outlet_for(u, credible) or domain_of(u)) for u in urls) or "-"
+        value = (str(e.get("event_th", ""))[:700] + "\n" + srcs)[:1024]
+        if cur is None or len(cur.fields) >= 8 or size + len(name) + len(value) > 5000:
+            cur, size = discord.Embed(color=0x0E2A47), 0
+            embeds.append(cur)
+        cur.add_field(name=name, value=value, inline=False)
+        size += len(name) + len(value)
+    tail = discord.Embed(color=0x0E2A47, title="Sides & where it stands")
+    for sd in data.get("sides", [])[:8]:
+        tail.add_field(name=f"{'✅' if sd.get('confirmed') else '⚠️'} {str(sd.get('party', ''))[:200]}",
+                       value=str(sd.get("position_th", ""))[:1000] or "-", inline=False)
+    tail.add_field(name=("✅" if data.get("status_confirmed") else "⚠️") + " ล่าสุด",
+                   value=str(data.get("status_now_th", ""))[:1000] or "-", inline=False)
+    embeds.append(tail)
+    return embeds
+
+
+class FactView(discord.ui.View):
+    def __init__(self, slug, blocked=False):
+        super().__init__(timeout=None)
+        if not blocked:
+            self.add_item(discord.ui.Button(label="Approve facts", style=discord.ButtonStyle.success,
+                                            custom_id=f"nf:a:{slug}"))
+        self.add_item(discord.ui.Button(label="Reject", style=discord.ButtonStyle.danger,
+                                        custom_id=f"nf:r:{slug}"))
+        if not blocked:
+            self.add_item(discord.ui.Button(label="Edit timeline", style=discord.ButtonStyle.secondary,
+                                            custom_id=f"nf:e:{slug}"))
+
+
+async def post_fact_card(slug, data):
+    """Timeline review: every event with date, confirmed / unconfirmed and source links, the
+    safety check, and the full research.json attached (download it to edit)."""
+    from pipeline import news
+    ch = await control()
+    embeds = fact_embeds(data)
+    for emb in embeds[:-1]:  # one embed per message: Discord caps a message at 6,000 embed characters
+        await ch.send(embed=emb)
+    path = news.news_dir(cfg, slug) / "research.json"
+    await ch.send(content=f"**{slug}** - check the facts above. Nothing is recorded until you tap "
+                          f"**Approve facts**.", embed=embeds[-1],
+                  file=discord.File(str(path), filename=f"{slug}-research.json"),
+                  view=FactView(slug, blocked=bool(data.get("safety_problems"))))
+
+
+class NewsTopicModal(discord.ui.Modal, title="New สรุปให้ฟัง topic"):
+    topic = discord.ui.TextInput(label="Topic (Thai or English)", max_length=200,
+                                 placeholder="e.g. ข้อถกเถียงร่างแก้ไขกฎหมายไทยพีบีเอส")
+
+    async def on_submit(self, inter: discord.Interaction):
+        await inter.response.send_message(f"Researching: {self.topic.value}", ephemeral=True)
+        bot.loop.create_task(run_news_research(self.topic.value, inter.user.display_name))
+
+
+class TimelineEditModal(discord.ui.Modal, title="Edit the timeline"):
+    def __init__(self, slug, current):
+        super().__init__()
+        self.slug = slug
+        self.box = discord.ui.TextInput(
+            label="Timeline JSON (date, time_if_known, event_th, source_urls)",
+            style=discord.TextStyle.paragraph, max_length=4000, required=True,
+            default=current if len(current) <= 4000 else None,
+            placeholder="Too long to show here - download the research.json above, edit "
+                        "'timeline', paste it here")
+        self.add_item(self.box)
+
+    async def on_submit(self, inter: discord.Interaction):
+        from pipeline import news
+        try:
+            new = json.loads(self.box.value)
+        except json.JSONDecodeError as e:
+            return await inter.response.send_message(f"That isn't valid JSON: {e}", ephemeral=True)
+        await inter.response.send_message("Timeline updated - re-checking sources...", ephemeral=True)
+        data = await asyncio.to_thread(news.replace_timeline, cfg, self.slug, new)
+        await say(f"**{self.slug}**: timeline edited by {inter.user.display_name} - confirmation "
+                  f"re-checked against the searched sources. Approve the facts again:")
+        await post_fact_card(self.slug, data)
+
+
+async def run_news_research(topic, user):
+    from pipeline import news
+    if job_lock.locked():
+        return await say("A job is already running - try again when it finishes.")
+    async with job_lock:
+        await say(f"**{MACHINE}**: researching news topic for {user}: `{topic}` (web search only, no voice)")
+        prog = Progress(bot.loop)
+        try:
+            slug, data = await asyncio.to_thread(news.research, cfg, topic, prog.log)
+            await prog.flush()
+            await post_fact_card(slug, data)
+        except SystemExit as e:  # monarchy refusal etc.
+            await prog.flush()
+            await say(f"⛔ {e}")
+        except BaseException as e:
+            await prog.flush()
+            await say(f"❌ news research failed: `{str(e)[:400]}`")
+            with open(ROOT / "data" / "errors.log", "a", encoding="utf-8") as f:
+                f.write(f"\n--- {datetime.now()} news research {topic}\n{traceback.format_exc()}")
+    await post_panel()
+
+
+async def run_news_build(slug, user):
+    from pipeline import news
+    async with job_lock:  # waits if another job runs
+        await say(f"**{MACHINE}**: facts approved by {user} - writing the script (+ safety review), "
+                  f"recording the voice and building `{slug}`...")
+        prog = Progress(bot.loop)
+        try:
+            out = await asyncio.to_thread(news.build, cfg, slug, False, prog.log)
+            await prog.flush()
+            await post_card(out)
+        except SystemExit as e:
+            await prog.flush()
+            await say(f"⛔ {slug}: {e}")
+        except BaseException as e:
+            await prog.flush()
+            await say(f"❌ {slug} build failed: `{str(e)[:400]}`")
+            with open(ROOT / "data" / "errors.log", "a", encoding="utf-8") as f:
+                f.write(f"\n--- {datetime.now()} news build {slug}\n{traceback.format_exc()}")
+    await post_panel()
+
+
+async def handle_news_card(inter, cid):
+    from pipeline import news
+    if not only_control(inter):
+        return await inter.response.send_message("Use the control channel.", ephemeral=True)
+    _, action, slug = cid.split(":", 2)
+    try:
+        path = news.news_dir(cfg, slug) / "research.json"
+    except SystemExit:
+        return await inter.response.send_message("That research no longer exists.", ephemeral=True)
+    data = news.read_json(path)
+    who = inter.user.display_name
+    if action == "e":
+        timeline = [{k: e.get(k) for k in ("date", "time_if_known", "event_th", "source_urls")}
+                    for e in data.get("timeline", [])]
+        return await inter.response.send_modal(
+            TimelineEditModal(slug, json.dumps(timeline, ensure_ascii=False, indent=1)))
+    if action == "r":
+        data["rejected_by"] = who
+        news.write_json(path, data)
+        return await inter.response.edit_message(view=None, content=f"**{slug}** - facts rejected by {who}.")
+    # approve facts
+    try:
+        await asyncio.to_thread(news.approve_facts, cfg, slug, who)
+    except SystemExit as e:
+        return await inter.response.send_message(f"⛔ Can't approve: {e}", ephemeral=True)
+    await inter.response.edit_message(view=None, content=f"**{slug}** - facts approved by {who}. Building the video...")
+    bot.loop.create_task(run_news_build(slug, who))
+
+
 # ---------------- slash commands (backup for the buttons) ----------------
 
 CHOICES = [app_commands.Choice(name="all my channels", value="all")] + [
@@ -700,6 +885,15 @@ if STORY_MODE:
                               languages: app_commands.Choice[str] = None,
                               what: app_commands.Choice[str] = None):
         await _story_cmd(inter, "build", slug, languages, what.value if what else "full")
+
+
+if NEWS_MODE:
+    @bot.tree.command(name="news", description="Research a Thai news topic for สรุปให้ฟัง (facts review first)")
+    async def news_cmd(inter: discord.Interaction, topic: str):
+        if not only_control(inter):
+            return await inter.response.send_message("Use the control channel.", ephemeral=True)
+        await inter.response.send_message(f"Researching: {topic}")
+        bot.loop.create_task(run_news_research(topic, inter.user.display_name))
 
 
 if __name__ == "__main__":

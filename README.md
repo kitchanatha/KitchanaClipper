@@ -293,10 +293,14 @@ python run.py news-approve <folder>        you approve the facts (Discord: Appro
 python run.py news-build <folder>          script + safety review + voice + video -> review card
 ```
 
-On Discord (computer with `MACHINE_NEWS=yes`): `/news <topic>` posts the researched timeline as a
+On Discord (computer with `MACHINE_NEWS=yes`): the **News** panel button (or `/news <topic>`) posts
+the researched timeline as a
 fact-review card (each event with date, confirmed / unconfirmed and source links, plus the safety
 check) with **Approve facts / Reject / Edit**. Only after **Approve facts** does it record the voice
 and build the video, which then arrives as the usual video review card (Approve uploads).
+**Edit timeline** opens a box with the timeline as JSON (or download the attached
+`research.json`, edit `timeline`, paste it back); source URLs must come from the original search,
+confirmation is re-checked and the facts must be approved again. Blocked stories only offer Reject.
 
 Setup: put a Thai voice ID in `config.yaml` -> `summed_up.voice_id`, run `python run.py fonts`
 (Kanit), create the YouTube channel and connect it with `python run.py auth --channel summed_up`.
