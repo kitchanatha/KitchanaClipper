@@ -53,7 +53,7 @@ def auth(ch):
     me = yt.channels().list(part="snippet", mine=True).execute()
     title = me["items"][0]["snippet"]["title"] if me.get("items") else "?"
     print(f"Signed in to YouTube channel: {title}")
-    if title.strip().lower() != ch["name"].strip().lower():
+    if ch["name"].strip().lower() not in title.strip().lower():  # "Name (English name)" is fine
         print(f"WARNING: expected '{ch['name']}'. Delete {ch['youtube_token']} and run auth again "
               "if this is the wrong channel.")
 
