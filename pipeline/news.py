@@ -18,10 +18,11 @@ import requests
 
 from .common import ROOT, env, slugify
 from .newslib import (apply_confirmation, confirmed_facts, monarchy_hits, safety_problems,
-                      script_problems, sources_block, thai_date)
+                      script_problems, sources_block, strip_date, thai_date)
 
 API = "https://api.anthropic.com/v1/messages"
 BKK = timezone(timedelta(hours=7))
+CHARS_PER_S = 12  # Thai narration speed measured on the สรุปให้ฟัง voice (665 chars = 54 s)
 
 RULES = """Hard rules - follow every one:
 1. Nothing about the Thai monarchy, the royal family or Section 112, directly or indirectly. If the
@@ -66,15 +67,20 @@ Use ONLY these confirmed facts (each event has an id; each fact was reported by 
 More rules for the script:
 - hook: one neutral question that makes people curious. It must NOT imply anyone is guilty.
 - beats: {b_lo}-{b_hi} beats in time order. Each beat: "event_ids" (ids it is based on), \
-"card_text" (on-screen summary, max 40 Thai characters, no names of minors/victims), \
-"narration" (what the narrator says, 1-2 short sentences, allegations phrased as allegations).
-- latest: where it stands now. "card_text" (max 80 characters) and "narration". If the status \
-above is "none", describe only the most recent confirmed event.
+"card_text" (on-screen summary, max 40 Thai characters, NO date in it - the date is shown \
+separately in a pill - and no names of minors/victims), "narration" (what the narrator says, \
+2-3 sentences with the key numbers and who reported them, allegations phrased as allegations).
+- latest: where it stands now. "card_text" (max 80 characters, no date) and "narration". If the \
+status above is "none", describe only the most recent confirmed event.
+- LENGTH BUDGET (Thai characters, spaces included): hook 50-70, each beat narration 90-120, \
+latest narration 110-150. Total narration must land between {c_lo} and {c_hi} characters - \
+scripts outside that range are rejected automatically, so keep every part inside its budget.
 - closing: exactly "{closing}"
 - title: under 70 characters, must contain "สรุป", may include a date. No clickbait.
 - description: 1-2 neutral sentences in Thai (sources are added automatically).
 - hashtags: 4 Thai hashtags. keywords: 5 English search terms for NEUTRAL vertical stock video \
-(city, phone screen, documents, abstract newsroom ...), never people, faces, logos or events.
+(rain, water, phone screen, documents, weather map, abstract data ...), never people, faces, logos, \
+events, or recognisable cities, skylines or landmarks.
 {fix}
 Return ONLY JSON: {{"title": "...", "hook": "...", "beats": [{{"event_ids": ["e1"], \
 "card_text": "...", "narration": "..."}}], "latest": {{"card_text": "...", "narration": "..."}}, \
@@ -137,9 +143,17 @@ def claude_web_research(cfg, prompt, domains, max_uses=10, log=print):
     messages = [{"role": "user", "content": prompt}]
     texts, urls, cited = [], [], []
     for turn in range(6):  # a long search can pause (pause_turn) - continue it
-        r = requests.post(API, headers=headers, timeout=900, json={
-            "model": cfg["news"].get("model") or cfg["claude"]["model"], "max_tokens": 16000,
-            "tools": tools, "messages": messages})
+        for _ in range(3):
+            r = requests.post(API, headers=headers, timeout=900, json={
+                "model": cfg["news"].get("model") or cfg["claude"]["model"], "max_tokens": 16000,
+                "tools": tools, "messages": messages})
+            # some outlets (e.g. Reuters, AP) block Anthropic's crawler: drop them and retry
+            blocked = re.search(r"domains are not accessible[^\[]*\[([^\]]*)\]", r.text) if r.status_code == 400 else None
+            if not blocked:
+                break
+            gone = {d.strip(" '\"") for d in blocked.group(1).split(",")}
+            log(f"  search can't reach {', '.join(sorted(gone))} - continuing without them")
+            tools[0]["allowed_domains"] = [d for d in tools[0]["allowed_domains"] if d not in gone]
         if r.status_code != 200:
             raise RuntimeError(f"Claude API error {r.status_code}: {r.text[:500]}")
         data = r.json()
@@ -276,14 +290,21 @@ def write_script(cfg, data, log=print):
     closing = nc["closing_line"]
     s_lo, s_hi = nc.get("script_seconds", [60, 90])
     fix, problems = "", []
-    for attempt in range(3):
+    lo, hi = s_lo * (CHARS_PER_S - 1), s_hi * CHARS_PER_S - 60  # this voice: ~12 Thai chars / s
+    for attempt in range(5):
         prompt = SCRIPT_PROMPT.format(channel=cfg["channels"][nc["channel"]]["name"], s_lo=s_lo,
-                                      s_hi=s_hi, c_lo=s_lo * 7, c_hi=s_hi * 7, facts=_facts_text(data),
+                                      s_hi=s_hi, c_lo=lo, c_hi=hi, facts=_facts_text(data),
                                       rules=RULES, b_lo=nc.get("min_beats", 4),
                                       b_hi=nc.get("max_beats", 7), closing=closing, fix=fix)
         script = _json_in(ask_claude(cfg, prompt, max_tokens=12000, timeout=600))
         script["closing"] = closing if script.get("closing", "").strip() == closing else script.get("closing", "")
+        for b in script.get("beats", []) + [script.get("latest") or {}]:
+            b["card_text"] = strip_date(b.get("card_text", ""))  # the date pill shows it already
         problems = script_problems(script, data, nc.get("min_beats", 4), nc.get("max_beats", 7), closing)
+        spoken = sum(len(t) for _, t in narration_parts(script)) if not problems else 0
+        if spoken and not lo <= spoken <= hi:
+            problems.append(f"narration is {spoken} characters - must be {lo}-{hi} "
+                            f"({s_lo}-{s_hi} s spoken)")
         if not problems:
             review = _json_in(ask_claude(cfg, REVIEW_PROMPT.format(
                 facts=_facts_text(data), script=json.dumps(script, ensure_ascii=False, indent=1)),

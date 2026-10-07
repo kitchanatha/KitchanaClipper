@@ -106,7 +106,12 @@ def caption_events(words, ch, cfg, total, y_frac=0.62, layer=0):
                     parts.append(r"{\c" + hi + r"&\fscx112\fscy112}" + t + r"{\c" + base + r"&\fscx100\fscy100}")
                 else:
                     parts.append(t)
-            text = r"{\an5\pos(" + f"{W//2},{int(H*y_frac)}" + ")}" + sep.join(parts)
+            if sep:
+                joined = sep.join(parts)
+            else:  # Thai / Chinese: keep only the spaces the script itself had
+                joined = "".join((" " if j and x.get("space_before") else "") + p
+                                 for j, (x, p) in enumerate(zip(g, parts)))
+            text = r"{\an5\pos(" + f"{W//2},{int(H*y_frac)}" + ")}" + joined
             lines.append(f"Dialogue: {layer},{_ts(start)},{_ts(end)},Cap,,0,0,0,,{text}")
     return lines
 

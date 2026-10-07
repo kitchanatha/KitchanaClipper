@@ -163,6 +163,23 @@ class CardText(unittest.TestCase):
             bounds.add(pos)
         self.assertIn(len(lines[0]), bounds)
 
+    def test_strip_leading_date(self):
+        self.assertEqual(N.strip_date("26 ก.ย. กทม. ประกาศเขตภัยครบ 50 เขต"), "กทม. ประกาศเขตภัยครบ 50 เขต")
+        self.assertEqual(N.strip_date("วันที่ 2 ต.ค. 69 เปิดลงทะเบียน"), "เปิดลงทะเบียน")
+        self.assertEqual(N.strip_date("ท่วม 27 จังหวัด"), "ท่วม 27 จังหวัด")   # numbers inside stay
+
+    def test_thai_captions_keep_script_spaces_and_punctuation(self):
+        from pipeline.voice import _split_words, word_timings
+        text = "ตอนนี้เป็นอย่างไร? ล่าสุด 6 ต.ค. ยังท่วม 27 จังหวัด"
+        words = [w for w, _, _ in _split_words(text, "th")]
+        self.assertFalse(any(w.startswith("?") for w in words), words)
+        self.assertTrue(any(w.endswith("?") for w in words), words)
+        al = {"characters": list(text), "character_start_times_seconds": [i * .05 for i in range(len(text))],
+              "character_end_times_seconds": [i * .05 + .05 for i in range(len(text))]}
+        wt = word_timings(text, al, "th")
+        joined = "".join((" " if w["space_before"] else "") + w["word"] for w in wt)
+        self.assertEqual(joined, text)
+
     def test_card_width_ignores_marks(self):
         self.assertEqual(N.card_width("ที่นี่"), 2)          # ท + น; the rest are marks
         self.assertEqual(N.card_width("กระทรวงคมนาคม"), 13)

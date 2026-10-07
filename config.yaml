@@ -43,7 +43,10 @@ news:                       # Thai news recaps (สรุปให้ฟัง) 
   darken: 0.55
   category_id: "25"         # News & Politics
   publish_times: ["12:00", "18:00"]
-  footage_exclude: [face, portrait, man, woman, people, crowd, protest, police, flag, logo]
+  footage_exclude: [face, portrait, man, woman, people, crowd, protest, police, flag, logo,
+                    city, cityscape, skyline, skyscraper, building, buildings, town, village, architecture,
+                    landmark, new, york, manhattan, london, paris, europe, tower, bridge, church]
+                            # no people, and no recognisable places (a foreign skyline would mislead)
   credible_outlets:         # domain -> outlet name. Only these are searched, and only these count.
     thaipbs.or.th: Thai PBS
     thaipbsworld.com: Thai PBS          # same newsroom - counts as one outlet
@@ -206,6 +209,6 @@ channels:
     highlight_color: "#FFD60A"            # accent: date pills, dots, current caption word
     latest_color: "#E63946"               # the "ล่าสุด" (latest) dot and pill
     youtube_token: tokens/summed_up.json
-    footage_hint: city skyline at night, phone screen scrolling, documents on desk, abstract data, newspaper printing
+    footage_hint: rain on window, water surface, phone screen scrolling, documents on desk, weather radar map, abstract data
     hashtags: ["#สรุปข่าว", "#สรุปดราม่า", "#สรุปให้ฟัง", "#shorts"]
     description_footer: "ติดตามสรุปให้ฟัง เพื่อไม่พลาดเรื่องที่คนพูดถึง"

@@ -228,6 +228,13 @@ def wrap_card(text, max_chars=20, max_lines=2):
 
 TH_MONTHS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.",
              "พ.ย.", "ธ.ค."]
+_LEAD_DATE = re.compile(r"^\s*(วันที่\s*)?\d{1,2}(\s*[–-]\s*\d{1,2})?\s*(" + "|".join(
+    re.escape(m) for m in TH_MONTHS) + r")(\s*\d{2,4})?\s*")
+
+
+def strip_date(text):
+    """'26 ก.ย. กทม. ประกาศ...' -> 'กทม. ประกาศ...' (the card's date pill already shows it)."""
+    return _LEAD_DATE.sub("", str(text or ""), count=1).strip()
 
 
 def thai_date(iso, with_year=False):

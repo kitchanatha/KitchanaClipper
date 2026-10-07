@@ -61,12 +61,16 @@ def _split_words(text, language):
             if tok.strip():
                 spans.append((tok, pos, pos + len(tok)))
             pos += len(tok)
-        # merge tiny Thai tokens so captions show readable chunks (~6+ chars)
+        # merge tiny Thai tokens so captions show readable chunks (~6+ chars); punctuation always
+        # stays with the word before it; merged chunks keep the original spaces ("2 ต.ค.")
         merged = []
         for w, s, e in spans:
-            if merged and len(merged[-1][0]) < 6 and not re.match(r"[\s.,!?]", w):
-                pw, ps, _ = merged[-1]
-                merged[-1] = (pw + w, ps, e)
+            if merged and re.fullmatch(r"[.,!?…:;)\]\"'”’]+", w):
+                ps = merged[-1][1]
+                merged[-1] = (text[ps:e], ps, e)
+            elif merged and len(merged[-1][0]) < 6 and not re.match(r"[\s.,!?]", w):
+                ps = merged[-1][1]
+                merged[-1] = (text[ps:e], ps, e)
             else:
                 merged.append((w, s, e))
         return merged
@@ -93,7 +97,12 @@ def word_timings(text, alignment, language="en"):
         n = max(len(words), 1)
         return [{"word": w, "start": i * total / n, "end": (i + 1) * total / n}
                 for i, (w, _, _) in enumerate(words)]
-    out = []
+    out, prev_end = [], None
     for w, s, e in words:
-        out.append({"word": w, "start": float(starts[s]), "end": float(ends[e - 1])})
+        out.append({"word": w, "start": float(starts[s]), "end": float(ends[e - 1]),
+                    # Thai / Chinese captions join words without spaces - except where the
+                    # script had one (e.g. between Thai words and a date or number)
+                    "space_before": prev_end is not None and bool(text[prev_end:s].strip() == ""
+                                                                    and text[prev_end:s])})
+        prev_end = e
     return out
