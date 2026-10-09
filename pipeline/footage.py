@@ -29,8 +29,10 @@ def _pexels_pick_file(video):
 
 
 def _excluded(text, exclude):
-    words = set(re.findall(r"[a-z]+", (text or "").lower()))
-    return any(x in words for x in exclude)
+    found = re.findall(r"[a-z]+", (text or "").lower())
+    words = set(found)
+    joined = " " + " ".join(found) + " "  # multi-word entries ("green screen") match as a phrase
+    return any((" " + x + " " in joined) if " " in x else x in words for x in exclude)
 
 
 # words that say how something looks, not what it is - they don't count as a topic match

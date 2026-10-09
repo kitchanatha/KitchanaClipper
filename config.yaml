@@ -48,6 +48,12 @@ news:                       # Thai news recaps (สรุปให้ฟัง) 
   category_id: "25"         # News & Politics
   publish_times: ["12:00", "18:00"]
   footage_exclude: [face, portrait, man, woman, people, crowd, protest, police, flag, logo,
+                    person, human, girl, boy, child, family, couple, worker, businessman, pilot,
+                    crew, stewardess, passenger, passengers, traveler, tourist, tourists,
+                    worried, panic, stress, anxiety, sad, happy, emotion, beard, war, conflict,
+                    youtube, subscribe, subscribers, green screen, social media, lovers, fisherman,
+                    market, vietnam, japan, turkey, istanbul, ai generated, student, teamwork,
+                    collaboration, looking,
                     city, cityscape, skyline, skyscraper, building, buildings, town, village, architecture,
                     landmark, new, york, manhattan, london, paris, europe, tower, bridge, church]
                             # no people, and no recognisable places (a foreign skyline would mislead)
