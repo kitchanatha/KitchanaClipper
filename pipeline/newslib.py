@@ -196,12 +196,17 @@ def script_problems(script, research, min_beats=4, max_beats=7, closing=None):
         if not card_fits(b.get("card_text", "")):
             problems.append(f"card text too long for the card ({card_width(b.get('card_text', ''))} "
                             f"characters, keep it about 40): {b.get('card_text')}")
+    hc = script.get("hook_card")
+    if not (isinstance(hc, list) and 1 <= len(hc) <= 2 and all(str(x).strip() for x in hc)):
+        problems.append("hook_card must be a list of 1-2 short lines (the big opening headline)")
+    elif any(card_width(x) > HOOK_LINE for x in hc):
+        problems.append(f"hook_card lines must be at most {HOOK_LINE} characters each: {hc}")
     title = script.get("title", "")
     if "สรุป" not in title or len(title) > 70:
         problems.append("title must contain 'สรุป' and be under 70 characters")
     if closing and script.get("closing", "").strip() != closing:
         problems.append("closing line must be exactly: " + closing)
-    all_text = " ".join([script.get("hook", ""), title, script.get("closing", ""),
+    all_text = " ".join([script.get("hook", ""), " ".join(map(str, hc or [])), title, script.get("closing", ""),
                          (script.get("latest") or {}).get("narration", ""),
                          (script.get("latest") or {}).get("card_text", "")]
                         + [b.get("narration", "") + " " + b.get("card_text", "") for b in beats])
@@ -219,6 +224,7 @@ def card_width(text):
 
 
 CARD_LINE = 22  # Thai characters per card line at the card font size
+HOOK_LINE = 13  # Thai characters per line of the big opening headline (hook_card)
 
 
 def card_fits(text, max_lines=2):

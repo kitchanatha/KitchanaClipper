@@ -120,6 +120,7 @@ class OnlyConfirmedInScript(unittest.TestCase):
         self.ids = {e["event_th"]: e["id"] for e in self.r["timeline"]}
         self.script = {
             "title": "สรุปดราม่าค่ารถไฟฟ้า 12 ก.ย.", "hook": "เกิดอะไรขึ้นกับค่ารถไฟฟ้า?",
+            "hook_card": ["ค่ารถไฟฟ้า", "เกิดอะไรขึ้น?"],
             "beats": [{"event_ids": [self.ids[x]], "card_text": "ข้อความสั้น", "narration": "..."}
                       for x in ("A2", "E", "F", "C")],
             "latest": {"card_text": "รอการพิจารณา", "narration": "..."},
@@ -144,8 +145,9 @@ class OnlyConfirmedInScript(unittest.TestCase):
         s["title"] = "ดราม่าค่ารถ"
         s["beats"][0]["card_text"] = "ก" * 50
         s["hook"] = "ในหลวงเกี่ยวข้องไหม"
+        s["hook_card"] = ["ค่ารถไฟฟ้าขึ้นราคาอีกแล้วทุกสาย"]
         p = " | ".join(N.script_problems(s, self.r, closing=self.script["closing"]))
-        for needle in ("4-7 timeline beats", "สรุป", "too long for the card", "monarchy"):
+        for needle in ("4-7 timeline beats", "สรุป", "too long for the card", "monarchy", "hook_card"):
             self.assertIn(needle, p)
 
 

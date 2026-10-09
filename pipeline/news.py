@@ -1,4 +1,4 @@
-"""News recaps (สรุปให้ฟัง): research -> (you approve the facts) -> script -> video.
+﻿"""News recaps (สรุปให้ฟัง): research -> (you approve the facts) -> script -> video.
 
   python run.py news-research "<topic>"     web research -> news/<slug>/research.json (+ table)
   python run.py news-show <slug>             print the research table again
@@ -17,7 +17,7 @@ from pathlib import Path
 import requests
 
 from .common import ROOT, env, slugify
-from .newslib import (apply_confirmation, confirmed_facts, monarchy_hits, safety_problems,
+from .newslib import (HOOK_LINE, apply_confirmation, confirmed_facts, monarchy_hits, safety_problems,
                       script_problems, sources_block, speakable, strip_date, thai_date)
 
 API = "https://api.anthropic.com/v1/messages"
@@ -65,14 +65,15 @@ Use ONLY these confirmed facts (each event has an id; each fact was reported by 
 
 {rules}
 More rules for the script:
-- hook: one neutral question that makes people curious. It must NOT imply anyone is guilty.
+- hook: ONE short neutral sentence (30-50 Thai characters, under 4 seconds spoken) that opens with the single most important number or fact and ends as a question, e.g. "เงินช่วยน้ำท่วม 9,000 บาท ใครได้บ้าง?". No channel name, no greeting, no "วันนี้เราจะมาสรุป". It must NOT imply anyone is guilty.
+- hook_card: the hook as a BIG on-screen headline shown from the very first frame (people decide in 2 seconds whether to keep watching): a list of 1-2 short lines, each at most {hook_line} Thai characters, line 1 = the key number / fact, line 2 = the question. Same facts as the hook, neutral.
 - beats: {b_lo}-{b_hi} beats in time order. Each beat: "event_ids" (ids it is based on), \
 "card_text" (on-screen summary, max 40 Thai characters, NO date in it - the date is shown \
 separately in a pill - and no names of minors/victims), "narration" (what the narrator says, \
 2-3 sentences with the key numbers and who reported them, allegations phrased as allegations).
 - latest: where it stands now. "card_text" (max 80 characters, no date) and "narration". If the \
 status above is "none", describe only the most recent confirmed event.
-- LENGTH BUDGET (Thai characters, spaces included): hook 50-70, each beat narration 90-120, \
+- LENGTH BUDGET (Thai characters, spaces included): hook 30-50, each beat narration 90-120, \
 latest narration 110-150. Total narration must land between {c_lo} and {c_hi} characters - \
 scripts outside that range are rejected automatically, so keep every part inside its budget. \
 Estimate lengths roughly; don't count characters one by one - the code measures them and will \
@@ -84,7 +85,7 @@ tell you the exact number if a draft is off.
 (rain, water, phone screen, documents, weather map, abstract data ...), never people, faces, logos, \
 events, or recognisable cities, skylines or landmarks.
 {fix}
-Return ONLY JSON: {{"title": "...", "hook": "...", "beats": [{{"event_ids": ["e1"], \
+Return ONLY JSON: {{"title": "...", "hook": "...", "hook_card": ["...", "..."], "beats": [{{"event_ids": ["e1"], \
 "card_text": "...", "narration": "..."}}], "latest": {{"card_text": "...", "narration": "..."}}, \
 "closing": "...", "description": "...", "hashtags": ["#..."], "keywords": ["..."]}}"""
 
@@ -93,7 +94,7 @@ confirmed facts. Reply ONLY JSON {{"ok": true/false, "issues": ["..."]}}.
 
 Flag (ok=false) if ANY sentence: states something not supported by the facts; states an \
 allegation as fact (must use ถูกกล่าวหาว่า / อ้างว่า / ตามรายงาน); contains an opinion, insult, \
-guess or verdict-like wording; mentions the monarchy or royal family in any way; names a minor or \
+guess or verdict-like wording (the on-screen hook_card too); mentions the monarchy or royal family in any way; names a minor or \
 a crime victim; contains graphic detail; or has a hook implying guilt.
 
 Facts:
@@ -308,7 +309,8 @@ def write_script(cfg, data, log=print, seconds=None):
                                       rules=RULES + "".join(f"\n- Editor's note: {n}"
                                                             for n in data.get("script_notes", [])),
                                       b_lo=nc.get("min_beats", 4),
-                                      b_hi=nc.get("max_beats", 7), closing=closing, fix=fix)
+                                      b_hi=nc.get("max_beats", 7), closing=closing, fix=fix,
+                                      hook_line=HOOK_LINE)
         script = _json_in(ask_claude(cfg, prompt, max_tokens=16000, timeout=600, effort="medium"))
         script["closing"] = closing if script.get("closing", "").strip() == closing else script.get("closing", "")
         for b in script.get("beats", []) + [script.get("latest") or {}]:
@@ -438,7 +440,8 @@ def build(cfg, slug, force_script=False, log=print, short=False):
                                  exclude=nc.get("footage_exclude", []))
         log("Rendering...")
         temp = make_background(cfg, clips, total, work)
-        write_news_ass(work / "news.ass", ch, cfg, script["title"], beats, latest, words, total)
+        write_news_ass(work / "news.ass", ch, cfg, script["title"], beats, latest, words, total,
+                       hook_card=script.get("hook_card"))
         finish_video(cfg, work, "news.ass", mp3, total, out_dir / "video.mp4", temp,
                      darken=float(nc.get("darken", 0.55)))
     except BaseException:

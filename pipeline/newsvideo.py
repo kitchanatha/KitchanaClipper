@@ -2,7 +2,8 @@
 
 Layout (1080x1920):
   top        logo (timeline line + dots) and channel name
-  0..beat1   the title, big, while the hook is spoken
+  0..beat1   the hook card (key number + question) pops in BIG from the first frame while the
+             short hook is spoken - people decide in ~2 s whether to keep watching
   beats      a card slides in when its beat starts being spoken: date pill (yellow), up to 2
              lines of summary (Kanit), "แหล่งข่าว: ..." line. Earlier beats stay as compact rows
              on the timeline line above it.
@@ -108,8 +109,9 @@ def compact_row(t0, t1, y, beat, ch):
     ]
 
 
-def write_news_ass(path, ch, cfg, title, beats, latest, words, total):
-    """beats: [{start, date_label, card_text, outlets}], latest: {start, card_text}."""
+def write_news_ass(path, ch, cfg, title, beats, latest, words, total, hook_card=None):
+    """beats: [{start, date_label, card_text, outlets}], latest: {start, card_text}.
+    hook_card: 1-2 headline lines for the opening (older scripts without it show the title)."""
     accent = ass_color(ch["highlight_color"])
     red = ass_color(ch.get("latest_color", "#E63946"))
     white = ass_color(ch["caption_color"])
@@ -124,6 +126,7 @@ def write_news_ass(path, ch, cfg, title, beats, latest, words, total):
         f"Style: Row,{font},40,{white},{white},&H00000000,&H64000000,-1,0,0,0,100,100,0,0,1,2,0,7,0,0,0,1",
         f"Style: Head,{head},54,{white},{white},&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,0,2,7,0,0,0,1",
         f"Style: Title,{head},88,{white},{white},&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,4,3,8,0,0,0,1",
+        f"Style: Hook,{head},150,{white},{white},{navy},&H80000000,0,0,0,0,100,100,0,0,1,8,4,8,0,0,0,1",
     ]
     ev = []
     end = total
@@ -131,12 +134,20 @@ def write_news_ass(path, ch, cfg, title, beats, latest, words, total):
     ev += logo(0, end, 70, 110, 1.0, accent, red, white)
     ev.append(_text(6, 0, end, "Head", 230, 96, ch["name"]))
     first = beats[0]["start"] if beats else latest["start"]
-    # title while the hook is spoken
-    tl = wrap_text(title, "th", 15)[:4]
-    for i, line in enumerate(tl):
-        ev.append(_text(4, 0, first, "Title", W // 2, 470 + 112 * i, line, r"\fad(300,200)", an=8))
-    ev.append(_draw(4, 0, first, rrect(W // 2 - 110, 470 + 112 * len(tl) + 26, 220, 12, 6), accent,
-                    r"\fad(300,200)"))
+    if hook_card:  # big headline from frame 1: line 1 (the number) yellow, line 2 white
+        pop = r"\fscx70\fscy70\t(0,180,\fscx106\fscy106)\t(180,300,\fscx100\fscy100)\fad(0,200)"
+        for i, line in enumerate(hook_card[:2]):
+            col = accent if i == 0 else white
+            ev.append(_text(4, 0, first, "Hook", W // 2, 560 + 190 * i, str(line).strip(),
+                            rf"\1c{col}" + pop, an=8))
+        ev.append(_draw(4, 0, first, rrect(W // 2 - 140, 560 + 190 * len(hook_card[:2]) + 30, 280, 14, 7),
+                        accent, r"\fad(0,200)"))
+    else:  # title while the hook is spoken
+        tl = wrap_text(title, "th", 15)[:4]
+        for i, line in enumerate(tl):
+            ev.append(_text(4, 0, first, "Title", W // 2, 470 + 112 * i, line, r"\fad(300,200)", an=8))
+        ev.append(_draw(4, 0, first, rrect(W // 2 - 110, 470 + 112 * len(tl) + 26, 220, 12, 6), accent,
+                        r"\fad(300,200)"))
     # beats: the timeline grows
     for k, b in enumerate(beats):
         t0, t1 = b["start"], (beats[k + 1]["start"] if k + 1 < len(beats) else latest["start"])
