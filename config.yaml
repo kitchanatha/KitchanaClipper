@@ -173,7 +173,9 @@ channels:
                       illustration, drawing, game, toy, person, man, woman, people, face, fair,
                       fairground, carousel, festival, seafood, food, restaurant, diver, surfer,
                       statue, statues, sculpture, sculptures, museum, fountain, monument, garden,
-                      church, religion, god, goddess, greek, roman, marble, artwork, nude]
+                      church, religion, god, goddess, greek, roman, marble, artwork, nude,
+                      london, landmark, tourism, eye view, drone, aerial, white eye, green screen,
+                      horror, effect, blender, architecture, bridge, city]
     hashtags: ["#facts", "#amazing", "#didyouknow", "#shorts"]
     description_footer: "Follow Wonder Minute for one amazing fact a day."
     style: |
