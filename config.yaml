@@ -157,6 +157,30 @@ channels:
       everyday situations (neighbors, wrong texts, strange coincidences).
       No violence or gore. Sometimes end with "Follow for part 2."
 
+  wonder_minute:
+    name: Wonder Minute
+    language: en
+    voice_id: nPczCjzI2devNBz1zQrb  # Brian - deep, warm narrator (ElevenLabs default voice)
+    font: Anton
+    caption_color: "#FFFFFF"
+    highlight_color: "#3DDCFF"
+    youtube_token: tokens/wonder_minute.json
+    footage_hint: ocean, deep sea, space, galaxy, volcano, jungle, wild animals, microscope, aurora
+    hashtags: ["#facts", "#amazing", "#didyouknow", "#shorts"]
+    description_footer: "Follow Wonder Minute for one amazing fact a day."
+    style: |
+      ONE amazing, true fact about nature, animals, space, the ocean, the human body,
+      earth, history or engineering - the kind that makes people say "wait, what?".
+      Open with the most surprising part in under 10 words. Then explain how / why it
+      happens in plain words, with one vivid comparison people can picture. Only
+      well-documented facts you are certain of: no made-up numbers, no myths, no
+      "scientists say" without substance, no exaggeration. End with:
+      "Follow for one amazing fact a day."
+    # "Popular ideas": most-viewed recent Shorts for these searches -> original topic ideas
+    trend_queries: ["amazing facts", "did you know facts", "mind blowing facts", "animal facts",
+                    "space facts", "ocean facts"]
+    trend_days: 30
+
   # ---------- story-reading channels (story mode only - not used by the daily Shorts run) ----------
 
   candlelit_en:

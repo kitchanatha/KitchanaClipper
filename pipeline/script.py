@@ -78,7 +78,8 @@ def _claude_call(cfg, prompt, max_tokens, system, timeout, effort=None):
         return r.json()
 
 
-def write_script(cfg, ch, recent_topics):
+def write_script(cfg, ch, recent_topics, idea=None):
+    """idea: a topic picked by the owner (e.g. from the popular-video ideas) - else Claude picks."""
     recent = "\n".join(f"- {t}" for t in recent_topics[-60:]) or "- (none yet)"
     s_lo, s_hi = cfg["video"].get("script_seconds", [35, 50])
     prompt = PROMPT.format(
@@ -87,6 +88,11 @@ def write_script(cfg, ch, recent_topics):
         s_lo=s_lo, s_hi=s_hi, w_lo=round(s_lo * 2.5), w_hi=round(s_hi * 2.5),
         t_lo=round(s_lo * 7), t_hi=round(s_hi * 7), z_lo=round(s_lo * 4.5), z_hi=round(s_hi * 4.5),
     )
+    if idea:
+        prompt += (f"\nThe owner picked the topic: {idea.get('idea')}\n"
+                   + (f"Suggested first line (improve it if you can): {idea['hook']}\n"
+                      if idea.get("hook") else "")
+                   + "Write the script about exactly this topic.\n")
     text = ask_claude(cfg, prompt, max_tokens=8000)
     m = re.search(r"\{.*\}", text, re.S)
     if not m:

@@ -310,6 +310,27 @@ confirmation is re-checked and the facts must be approved again. Blocked stories
 Setup: put a Thai voice ID in `config.yaml` -> `summed_up.voice_id`, run `python run.py fonts`
 (Kanit), create the YouTube channel and connect it with `python run.py auth --channel summed_up`.
 
+## 9. Popular ideas - Wonder Minute (amazing facts)
+
+Wonder Minute is a normal Shorts channel (one true, amazing fact per video, narrated over stock
+footage). Its topics can come from what is popular: the bot searches YouTube for the most-viewed
+Shorts of the last `trend_days` days for each of the channel's `trend_queries`, and Claude turns
+them into **original** ideas. We never copy another creator's title, script or footage - popular
+videos only show which subjects people want.
+
+```
+python run.py ideas --channel wonder_minute                 popular Shorts -> numbered ideas (data/ideas_wonder_minute.json)
+python run.py generate --channel wonder_minute --idea 3     make idea 3 -> review card as usual
+```
+
+On Discord (computer with `MACHINE_IDEAS=yes`): **Popular ideas** posts the list with a
+**Make 1..8** button per idea and **New ideas**. Nothing is made until you tap Make, and every video
+still needs Approve before upload. Each search uses 100 of YouTube's 10,000 daily quota units
+(6 searches per list).
+
+Setup: create the YouTube channel, then `python run.py auth --channel wonder_minute`. To also make
+one Wonder Minute video in the daily run, add `wonder_minute` to `MACHINE_CHANNELS`.
+
 ## Files
 
 | Path | What |

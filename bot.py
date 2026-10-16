@@ -37,7 +37,10 @@ STORY_KEYS = list(dict.fromkeys(cfg.get("story", {}).get("channels", {}).values(
 # News recaps (สรุปให้ฟัง) run on the computer with MACHINE_NEWS=yes
 NEWS_MODE = os.environ.get("MACHINE_NEWS", "").strip().lower() in ("1", "yes", "true", "on")
 NEWS_KEYS = [cfg["news"]["channel"]] if NEWS_MODE and cfg.get("news") else []
-REVIEW_KEYS = list(dict.fromkeys(MY_CHANNELS + STORY_KEYS + NEWS_KEYS))
+# "Popular ideas" (channels with trend_queries) run on the computer with MACHINE_IDEAS=yes
+IDEAS_MODE = os.environ.get("MACHINE_IDEAS", "").strip().lower() in ("1", "yes", "true", "on")
+IDEA_KEYS = [k for k, c in cfg["channels"].items() if c.get("trend_queries")] if IDEAS_MODE else []
+REVIEW_KEYS = list(dict.fromkeys(MY_CHANNELS + STORY_KEYS + NEWS_KEYS + IDEA_KEYS))
 
 STATE = ROOT / "data" / f"bot_state_{MACHINE}.json"
 AUTO = cfg.get("automation", {})
@@ -215,6 +218,8 @@ async def on_interaction(inter: discord.Interaction):
         return await handle_panel(inter, cid)
     if cid.startswith("nf:"):
         return await handle_news_card(inter, cid)
+    if cid.startswith("id:"):
+        return await handle_idea(inter, cid)
     if not cid.startswith("fp:"):
         return
     _, action, rest = cid.split(":", 2)
@@ -253,7 +258,7 @@ def upload_warnings(key, name):
 
 # ---------------- jobs ----------------
 
-async def run_generate(keys, count, reason, wait=False):
+async def run_generate(keys, count, reason, wait=False, idea=None):
     if job_lock.locked():
         if not wait:
             await say("A job is already running - try again when it finishes.")
@@ -265,7 +270,7 @@ async def run_generate(keys, count, reason, wait=False):
         for key in keys:
             for _ in range(count):
                 try:
-                    folder = await asyncio.to_thread(core.generate_one, cfg, key)
+                    folder = await asyncio.to_thread(core.generate_one, cfg, key, idea=idea)
                     made += 1
                     await post_card(folder)
                 except BaseException as e:
@@ -323,6 +328,60 @@ async def do_generate(inter, keys, count=1):
     bot.loop.create_task(run_generate(keys, count, f"manual run by {inter.user.display_name}"))
 
 
+# ---------------- popular ideas ----------------
+
+def ideas_view(key, n):
+    """Persistent buttons under an ideas list: one per idea + 'New ideas'."""
+    v = discord.ui.View(timeout=None)
+    for i in range(1, n + 1):
+        v.add_item(discord.ui.Button(label=f"Make {i}", custom_id=f"id:{key}:{i}",
+                                     style=discord.ButtonStyle.primary, row=(i - 1) // 5))
+    v.add_item(discord.ui.Button(label="New ideas", custom_id=f"id:{key}:new",
+                                 style=discord.ButtonStyle.secondary, row=(n - 1) // 5 + 1))
+    return v
+
+
+async def do_ideas(inter, key):
+    """Search the most-viewed recent Shorts and post numbered original ideas (costs one small
+    Claude call + YouTube search quota; nothing is made until a 'Make' button is tapped)."""
+    from pipeline.trends import find_ideas, ideas_text
+    if job_lock.locked():
+        return await inter.response.send_message("A job is already running - wait for it to finish.",
+                                                 ephemeral=True)
+    await inter.response.send_message(f"Looking at popular {cfg['channels'][key]['name']} Shorts...")
+    async with job_lock:
+        try:
+            data = await asyncio.to_thread(find_ideas, cfg, key, 8, lambda *_: None)
+        except BaseException as e:
+            return await say(f"Popular ideas failed: `{str(e)[:400]}`")
+    ch = await control()
+    await ch.send(f"**{cfg['channels'][key]['name']}** - " + ideas_text(data),
+                  view=ideas_view(key, len(data["ideas"])))
+    await post_panel()
+
+
+async def handle_idea(inter, cid):
+    from pipeline.trends import load_ideas
+    if not only_control(inter):
+        return await inter.response.send_message("Use the control channel.", ephemeral=True)
+    _, key, what = cid.split(":", 2)
+    if key not in IDEA_KEYS:
+        return await inter.response.send_message("Popular ideas are off on this computer.",
+                                                 ephemeral=True)
+    if what == "new":
+        return await do_ideas(inter, key)
+    data = load_ideas(key)
+    n = int(what)
+    if not data or n > len(data["ideas"]):
+        return await inter.response.send_message("That list is gone - tap New ideas.", ephemeral=True)
+    if job_lock.locked():
+        return await inter.response.send_message("A job is already running - wait for it to finish.",
+                                                 ephemeral=True)
+    idea = data["ideas"][n - 1]
+    await inter.response.send_message(f"Making idea {n}: {idea['idea'][:150]}")
+    bot.loop.create_task(run_generate([key], 1, f"idea {n} by {inter.user.display_name}", idea=idea))
+
+
 async def do_pending(inter):
     base = Path(cfg["output_dir"]) / "review"
     items = [p for k in REVIEW_KEYS for p in sorted((base / k).glob("*")) if (p / "video.mp4").exists()]
@@ -378,7 +437,8 @@ def panel_view():
         ("Resume daily run", "cp:resume", discord.ButtonStyle.secondary, 1),
         ("Set daily time", "cp:settime", discord.ButtonStyle.secondary, 1),
     ] + ([("Stories", "cp:stories", discord.ButtonStyle.primary, 1)] if STORY_MODE else []) \
-      + ([("News", "cp:news", discord.ButtonStyle.primary, 1)] if NEWS_MODE else []):
+      + ([("News", "cp:news", discord.ButtonStyle.primary, 1)] if NEWS_MODE else []) \
+      + ([("Popular ideas", "cp:ideas", discord.ButtonStyle.primary, 2)] if IDEA_KEYS else []):
         v.add_item(discord.ui.Button(label=label, custom_id=cid, style=style, row=row))
     return v
 
@@ -442,6 +502,20 @@ async def handle_panel(inter, cid):
         await inter.response.send_modal(TimeModal())
     elif cid == "cp:stories":
         await open_stories(inter)
+    elif cid == "cp:ideas" or cid.startswith("cp:ideas:"):
+        if not IDEA_KEYS:
+            return await inter.response.send_message("Popular ideas are off on this computer.",
+                                                     ephemeral=True)
+        if cid == "cp:ideas" and len(IDEA_KEYS) > 1:
+            v = discord.ui.View(timeout=300)
+            for k in IDEA_KEYS:
+                v.add_item(discord.ui.Button(label=cfg["channels"][k]["name"], custom_id=f"cp:ideas:{k}",
+                                             style=discord.ButtonStyle.primary))
+            return await inter.response.send_message("Popular ideas for:", view=v, ephemeral=True)
+        key = cid.split(":", 2)[2] if cid.count(":") == 2 else IDEA_KEYS[0]
+        if key not in IDEA_KEYS:
+            return await inter.response.send_message("Unknown channel.", ephemeral=True)
+        await do_ideas(inter, key)
     elif cid == "cp:news":
         if not NEWS_MODE:
             return await inter.response.send_message("News mode is off on this computer.", ephemeral=True)

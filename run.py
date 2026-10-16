@@ -7,6 +7,8 @@
   python run.py auth --channel storytime_cuts                  connect a YouTube channel (once)
   python run.py test-video                                     offline test: no API keys needed
   python run.py generate --channel X --script my_script.json   use your own script (skips Claude)
+  python run.py ideas --channel wonder_minute                   popular Shorts -> numbered original ideas
+  python run.py generate --channel wonder_minute --idea 3       make idea 3 from that list
 
 Story mode (Candlelit Tales, README section 7):
   python run.py story-check the-monkeys-paw                     validate rights + show length / cost
@@ -61,9 +63,10 @@ def channel_keys(cfg, only=None, shorts_only=False):
 
 
 def generate_one(cfg, key, script_file=None, script=None, folder=None, extra_meta=None,
-                 voice_cache=None, footage_exclude=(), strict_footage=False):
+                 voice_cache=None, footage_exclude=(), strict_footage=False, idea=None):
     """Make one Short. script / folder / extra_meta / voice_cache / footage_exclude let story
-    mode reuse this for trailers (a cached voice makes re-doing the visuals free)."""
+    mode reuse this for trailers (a cached voice makes re-doing the visuals free).
+    idea: {idea, hook} picked from the popular-video ideas (trends)."""
     from pipeline.script import write_script
     from pipeline.voice import make_voice
     from pipeline.footage import get_footage
@@ -76,7 +79,7 @@ def generate_one(cfg, key, script_file=None, script=None, folder=None, extra_met
         s = script
     else:
         print(f"[{ch['name']}] writing script...")
-        s = load_script(script_file) if script_file else write_script(cfg, ch, h["topics"])
+        s = load_script(script_file) if script_file else write_script(cfg, ch, h["topics"], idea)
     print(f"[{ch['name']}] '{s['title']}'")
 
     if folder is None:
@@ -294,7 +297,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("command", choices=["generate", "daily", "review", "upload", "auth", "test-video",
                                         "story-check", "story-prep", "story-build", "fonts",
-                                        "news-research", "news-show", "news-approve", "news-build"])
+                                        "news-research", "news-show", "news-approve", "news-build",
+                                        "ideas"])
     ap.add_argument("slug", nargs="?", help="story folder name (story-* commands)")
     ap.add_argument("--lang", help="story languages, e.g. en or en,th,zh (default: all in config)")
     ap.add_argument("--yes", action="store_true", help="story-build: don't ask before paying for audio")
@@ -309,12 +313,27 @@ def main():
     ap.add_argument("--channel", help="channel key from config.yaml (default: all)")
     ap.add_argument("--count", type=int, default=1)
     ap.add_argument("--script", help="JSON file with your own script (generate only, skips Claude)")
+    ap.add_argument("--idea", type=int, help="generate: make idea N from the last 'ideas' list")
     a = ap.parse_args()
     cfg = load_config()
-    if a.command == "generate":
+    if a.command == "generate" and a.idea:
+        if not a.channel:
+            sys.exit("--idea needs --channel")
+        from pipeline.trends import load_ideas
+        data = load_ideas(a.channel)
+        if not data or not 1 <= a.idea <= len(data["ideas"]):
+            sys.exit(f"No idea {a.idea} - run: python run.py ideas --channel {a.channel}")
+        check_ffmpeg()
+        generate_one(cfg, a.channel, idea=data["ideas"][a.idea - 1])
+    elif a.command == "generate":
         if a.script and (not a.channel or a.count != 1):
             sys.exit("--script needs --channel and makes one video")
         cmd_generate(cfg, a.channel, a.count, a.script)
+    elif a.command == "ideas":
+        if not a.channel:
+            sys.exit("Use --channel, e.g. python run.py ideas --channel wonder_minute")
+        from pipeline.trends import find_ideas, ideas_text
+        print(ideas_text(find_ideas(cfg, a.channel), limit=100000).replace("**", ""))
     elif a.command == "daily":
         cmd_generate(cfg, a.channel, int(cfg.get("daily_count", 1)))
     elif a.command == "review":
