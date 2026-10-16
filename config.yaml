@@ -130,6 +130,7 @@ channels:
     caption_color: "#F2C14E"
     highlight_color: "#FFFFFF"
     youtube_token: tokens/mindset_minute.json
+    hook_card: true         # big 2-6 word headline (often a quote-like line) for the first ~2-3 s
     footage_hint: cinematic city, sunrise, focused person, office desk, money, running, mountains
     hashtags: ["#mindset", "#money", "#selfimprovement", "#shorts"]
     description_footer: "Follow Mindset Minute for one lesson a day."
@@ -148,6 +149,7 @@ channels:
     caption_color: "#F5E9FF"
     highlight_color: "#FFB86B"
     youtube_token: tokens/storytime_cuts.json
+    hook_card: true         # big 2-6 word headline (the story's mystery as a question) for the first ~2-3 s
     footage_hint: night city, rain on window, phone screen, empty street, apartment, mysterious hallway
     hashtags: ["#storytime", "#story", "#shorts"]
     description_footer: "This is a fictional story. Follow Storytime Cuts for more."
