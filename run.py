@@ -165,7 +165,9 @@ def cmd_generate(cfg, channel, count, script_file=None):
     for key in channel_keys(cfg, channel, shorts_only=True):
         for _ in range(count):
             try:
-                generate_one(cfg, key, script_file)
+                up = auto_upload(cfg, key, generate_one(cfg, key, script_file))
+                if up:
+                    print(f"[{key}] auto-uploaded (private): {up[0]}")
             except SystemExit:
                 raise
             except Exception as e:
@@ -221,6 +223,14 @@ def decide(cfg, folder, approve):
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(folder), str(dest))
     return dest
+
+
+def auto_upload(cfg, key, folder):
+    """Channels with auto_upload: true skip the review step: approve + upload right after
+    making. Returns (url, slot), or None for channels that keep review."""
+    if not cfg["channels"][key].get("auto_upload"):
+        return None
+    return upload_one(cfg, key, decide(cfg, folder, True))
 
 
 def upload_one(cfg, key, folder):
@@ -328,7 +338,10 @@ def main():
         if not data or not 1 <= a.idea <= len(data["ideas"]):
             sys.exit(f"No idea {a.idea} - run: python run.py ideas --channel {a.channel}")
         check_ffmpeg()
-        generate_one(cfg, a.channel, idea=data["ideas"][a.idea - 1])
+        folder = generate_one(cfg, a.channel, idea=data["ideas"][a.idea - 1])
+        up = auto_upload(cfg, a.channel, folder)
+        if up:
+            print(f"Auto-uploaded (private): {up[0]} - suggested slot {up[1]:%d %b %H:%M}")
     elif a.command == "generate":
         if a.script and (not a.channel or a.count != 1):
             sys.exit("--script needs --channel and makes one video")

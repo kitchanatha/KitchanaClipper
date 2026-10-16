@@ -272,7 +272,19 @@ async def run_generate(keys, count, reason, wait=False, idea=None):
                 try:
                     folder = await asyncio.to_thread(core.generate_one, cfg, key, idea=idea)
                     made += 1
-                    await post_card(folder)
+                    if cfg["channels"][key].get("auto_upload"):  # no review for this channel
+                        try:
+                            url, slot = await asyncio.to_thread(core.auto_upload, cfg, key, folder)
+                            m = json.loads((find_video(key, folder.name) / "meta.json").read_text(
+                                encoding="utf-8"))
+                            await (await control()).send(
+                                f"**{cfg['channels'][key]['name']}** auto-uploaded: **{m['title']}**\n"
+                                f"{upload_note(slot)}\n{url}", view=CaptionView(key, folder.name))
+                        except BaseException as e:
+                            await say(f"[{key}] made but upload failed: `{str(e)[:300]}` - "
+                                      "it is in approved/, tap Upload approved to retry.")
+                    else:
+                        await post_card(folder)
                 except BaseException as e:
                     failed += 1
                     await say(f"[{key}] failed: `{str(e)[:400]}`")

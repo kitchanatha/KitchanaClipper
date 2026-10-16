@@ -328,6 +328,11 @@ On Discord (computer with `MACHINE_IDEAS=yes`): **Popular ideas** posts the list
 still needs Approve before upload. Each search uses 100 of YouTube's 10,000 daily quota units
 (6 searches per list).
 
+**Auto-upload:** Wonder Minute has `auto_upload: true` - no review card; each video is uploaded
+(private) as soon as it is made and Discord gets the link + caption buttons. Any channel can use it
+by adding `auto_upload: true` under it in `config.yaml`; remove it to bring the review step back.
+News (สรุปให้ฟัง) and story videos always keep their review step.
+
 Setup: create the YouTube channel, then `python run.py auth --channel wonder_minute`. To also make
 one Wonder Minute video in the daily run, add `wonder_minute` to `MACHINE_CHANNELS`.
 

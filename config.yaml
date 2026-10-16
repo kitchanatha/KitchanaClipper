@@ -188,6 +188,7 @@ channels:
       it does (e.g. "octopus swimming", "octopus close up", "octopus camouflage") - 4 of the 5
       keywords about the subject itself.
     # "Popular ideas": most-viewed recent Shorts for these searches -> original topic ideas
+    auto_upload: true         # no review step: uploads (private) right after it is made
     trend_queries: ["amazing facts", "did you know facts", "mind blowing facts", "animal facts",
                     "space facts", "ocean facts"]
     trend_days: 30
