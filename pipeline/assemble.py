@@ -72,15 +72,54 @@ def caption_style(ch, size=None):
             f"100,100,1,0,1,7,3,5,60,60,0,1")
 
 
-def write_ass(words, path, ch, cfg, total):
+def hook_end(words, lo=1.5, hi=4.0):
+    """When the first spoken sentence ends (the hook headline stays that long)."""
+    for w in words:
+        if str(w["word"]).rstrip("\"')").endswith((".", "?", "!")):
+            return min(max(w["end"] + 0.2, lo), hi)
+    return hi
+
+
+def hook_lines(text, width=13):
+    """Split the headline into at most 3 short lines (English: by words)."""
+    out, cur = [], ""
+    for w in str(text).split():
+        if cur and len(cur) + 1 + len(w) > width:
+            out.append(cur)
+            cur = w
+        else:
+            cur = f"{cur} {w}".strip()
+    return (out + [cur])[:3] if cur else out[:3]
+
+
+def hook_events(hook, words, ch, cfg):
+    """Big headline in the top third from the first frame until the first sentence ends."""
     W, H = cfg["video"]["width"], cfg["video"]["height"]
+    end = hook_end(words)
+    hi, base = _ass_color(ch["highlight_color"]), _ass_color(ch["caption_color"])
+    pop = r"\fscx70\fscy70\t(0,160,\fscx108\fscy108)\t(160,280,\fscx100\fscy100)\fad(0,200)"
+    ls = hook_lines(hook.upper() if ch.get("language", "en") == "en" else hook)
+    text = r"\N".join((r"{\c" + hi + "&}" if i % 2 == 0 else r"{\c" + base + "&}") + _clean(x)
+                      for i, x in enumerate(ls))
+    return [f"Dialogue: 5,{_ts(0)},{_ts(end)},Hook,,0,0,0,,"
+            + r"{\an8\pos(" + f"{W // 2},{int(H * 0.17)}" + ")" + pop + "}" + text]
+
+
+def write_ass(words, path, ch, cfg, total, hook=None):
+    """hook: optional big opening headline (channels with hook_card: true)."""
+    W, H = cfg["video"]["width"], cfg["video"]["height"]
+    size = 150 if ch.get("language", "en") == "en" else 120
     lines = [
         "[Script Info]", "ScriptType: v4.00+", f"PlayResX: {W}", f"PlayResY: {H}",
         "WrapStyle: 0", "ScaledBorderAndShadow: yes", "",
         "[V4+ Styles]", ASS_STYLE_FORMAT, caption_style(ch),
+        f"Style: Hook,{ch.get('font', 'Anton')},{size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,"
+        f"1,0,0,0,100,100,2,0,1,9,5,8,60,60,0,1",
         "", "[Events]",
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
     ]
+    if hook:
+        lines += hook_events(hook, words, ch, cfg)
     lines += caption_events(words, ch, cfg, total)
     Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -137,17 +176,19 @@ def motion_filter(W, H, amount, dur, i):
     return (f"scale={bw}:{bh}:force_original_aspect_ratio=increase,crop={W}:{H}:x='{x}':y='{y}'")
 
 
-def build_video(cfg, ch, clips, voice_mp3, words, workdir, out_mp4):
+def build_video(cfg, ch, clips, voice_mp3, words, workdir, out_mp4, hook=None):
+    """hook: big opening headline; the video then also opens on the best-matching clip."""
     workdir = Path(workdir)
     total = duration(voice_mp3) + 0.6
-    seg_files = make_background(cfg, clips, total, workdir)
-    write_ass(words, workdir / "captions.ass", ch, cfg, total)
+    seg_files = make_background(cfg, clips, total, workdir, first=clips[0] if hook and clips else None)
+    write_ass(words, workdir / "captions.ass", ch, cfg, total, hook)
     finish_video(cfg, workdir, "captions.ass", voice_mp3, total, out_mp4, seg_files)
     return total
 
 
-def make_background(cfg, clips, total, workdir):
+def make_background(cfg, clips, total, workdir, first=None):
     """Cut the clips into clip_seconds segments (slow pan) and join them as workdir/bg.mp4.
+    first: the clip to open on (the top search result for the subject).
     Returns the segment files (removed by finish_video)."""
     workdir = Path(workdir)
     v = cfg["video"]
@@ -155,6 +196,9 @@ def make_background(cfg, clips, total, workdir):
     n = int(total // seg) + 1
     order = list(clips)
     random.shuffle(order)
+    if first in order:
+        order.remove(first)
+        order.insert(0, first)
     seg_files = []
     for i in range(n):
         src = order[i % len(order)]

@@ -26,6 +26,7 @@ Return ONLY a JSON object, no markdown, with these keys:
 - "title": YouTube Shorts title, under 70 characters, in {language}
 - "topic": 3-6 word summary in English (used to avoid repeats)
 - "script": the full narration exactly as it should be spoken, including the hook as the first sentence. No stage directions, no emojis.
+- "hook_text": 2-6 words shown HUGE on screen from the very first frame, before anyone decides to scroll: the most surprising part as a question or a punchy quote-like line (e.g. "Your eye breathes air?", "Price tags lie."). Same language as the script, no hashtags, no emojis.
 - "keywords": 5 short English search terms for vertical stock video that matches the mood and story, ordered to follow the script. Visual and concrete (e.g. "rain on window", "man counting cash").
 - "description": 1-2 sentence YouTube description in {language}
 - "hashtags": 3 extra relevant hashtags

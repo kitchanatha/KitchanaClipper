@@ -194,6 +194,7 @@ channels:
       keywords about the subject itself.
     # "Popular ideas": most-viewed recent Shorts for these searches -> original topic ideas
     auto_upload: true         # no review step: uploads (private) right after it is made
+    hook_card: true           # big 2-6 word headline over the best clip for the first ~2-3 s
     trend_queries: ["amazing facts", "did you know facts", "mind blowing facts", "animal facts",
                     "space facts", "ocean facts"]
     trend_days: 30

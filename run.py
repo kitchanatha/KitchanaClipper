@@ -104,7 +104,8 @@ def generate_one(cfg, key, script_file=None, script=None, folder=None, extra_met
                                          strict_footage or cfg["video"].get("strict_footage", False)),
                                  per_keyword=int(ch.get("clips_per_keyword", 2)))
         print(f"[{ch['name']}] building video...")
-        total = build_video(cfg, ch, clips, folder / "voice.mp3", words, work, folder / "video.mp4")
+        total = build_video(cfg, ch, clips, folder / "voice.mp3", words, work, folder / "video.mp4",
+                            hook=s.get("hook_text") if ch.get("hook_card") else None)
         meta = {**s, "channel": key, "channel_name": ch["name"], "length_sec": round(total, 1),
                 "created": datetime.now().isoformat(timespec="seconds"), "pexels_ids": ids,
                 **(extra_meta or {})}
