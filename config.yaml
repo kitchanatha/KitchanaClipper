@@ -78,6 +78,7 @@ social:                     # Facebook + Instagram captions for every video (Dis
     storytime_cuts: ""
     candlelit_en: ""
     summed_up: "@สรุปให้ฟังOfficial"
+    wonder_minute: ""
 
 automation:                 # used by the Discord bot (bot.py)
   daily_time: "01:30"       # this computer's local time; change from Discord with /settime
