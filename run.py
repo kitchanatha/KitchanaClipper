@@ -97,8 +97,10 @@ def generate_one(cfg, key, script_file=None, script=None, folder=None, extra_met
         print(f"[{ch['name']}] finding footage for {secs:.0f}s...")
         clips, ids = get_footage(s["keywords"], ch.get("footage_hint", ""), secs,
                                  float(cfg["video"]["clip_seconds"]), work, h["pexels_ids"][-300:],
-                                 exclude=footage_exclude,
-                                 strict=strict_footage or cfg["video"].get("strict_footage", False))
+                                 exclude=list(footage_exclude) + ch.get("footage_exclude", []),
+                                 strict=("subject" if ch.get("footage_match") == "subject" else
+                                         strict_footage or cfg["video"].get("strict_footage", False)),
+                                 per_keyword=int(ch.get("clips_per_keyword", 2)))
         print(f"[{ch['name']}] building video...")
         total = build_video(cfg, ch, clips, folder / "voice.mp3", words, work, folder / "video.mp4")
         meta = {**s, "channel": key, "channel_name": ch["name"], "length_sec": round(total, 1),

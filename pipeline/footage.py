@@ -58,6 +58,18 @@ def relevant(query, text):
     return False
 
 
+def has_subject(query, text):
+    """strict="subject": the query's FIRST word (the subject, e.g. 'octopus' in 'octopus
+    swimming') must itself be a tag - not just any word of the query ('underwater' alone would
+    bring jellyfish)."""
+    words = re.findall(r"[a-z]+", query.lower())
+    if not words:
+        return True
+    s = words[0]
+    return any(t == s or (len(s) > 3 and t.startswith(s) and len(t) - len(s) <= 2)
+               for t in re.findall(r"[a-z]+", (text or "").lower()))
+
+
 def _pexels_search(key, q, page, clip_seconds, seen, orientation="portrait", exclude=(),
                    strict=False):
     """Returns [(history_id, download_url)] for one search."""
@@ -70,7 +82,7 @@ def _pexels_search(key, q, page, clip_seconds, seen, orientation="portrait", exc
     for v in r.json().get("videos", []):
         if v["id"] in seen or v.get("duration", 0) < clip_seconds or _excluded(v.get("url"), exclude):
             continue
-        if strict and not relevant(q, v.get("url")):
+        if strict and not relevant(q, v.get("url")) or strict in ("subject", "subject-only") and not has_subject(q, v.get("url")):
             continue
         link = _pexels_pick_file(v)
         if link:
@@ -101,7 +113,8 @@ def _pixabay_search(key, q, page, clip_seconds, seen, orientation="portrait", ex
     Pixabay matches any word of the query, so only its top results stay on topic."""
     r = requests.get(PIXABAY_SEARCH,
                      params={"key": key, "q": q[:100], "video_type": "film",
-                             "safesearch": "true", "per_page": 10, "page": page}, timeout=60)
+                             "safesearch": "true", "per_page": 20 if strict in ("subject", "subject-only") else 10,
+                             "page": page}, timeout=60)
     if r.status_code != 200:
         raise RuntimeError(f"Pixabay error {r.status_code}: {r.text[:300]}")
     wanted, other = [], []
@@ -109,7 +122,7 @@ def _pixabay_search(key, q, page, clip_seconds, seen, orientation="portrait", ex
         hid = f"pixabay_{v['id']}"
         if hid in seen or v.get("duration", 0) < clip_seconds or _excluded(v.get("tags"), exclude):
             continue
-        if strict and not relevant(q, v.get("tags")):
+        if strict and not relevant(q, v.get("tags")) or strict in ("subject", "subject-only") and not has_subject(q, v.get("tags")):
             continue
         link, matches = _pixabay_pick_file(v, orientation)
         if link:
@@ -121,9 +134,12 @@ def _pixabay_search(key, q, page, clip_seconds, seen, orientation="portrait", ex
 
 
 def get_footage(keywords, extra_hint, needed_seconds, clip_seconds, folder, used_ids,
-                orientation="portrait", exclude=(), strict=False):
+                orientation="portrait", exclude=(), strict=False, per_keyword=2):
     """Download enough clips to cover the voiceover. Returns (file paths, history ids).
-    strict (story mode): keep search ranking and skip clips whose tags don't match the search."""
+    strict (story mode): keep search ranking and skip clips whose tags don't match the search;
+    strict="subject" also needs the search's first word as a tag (channel footage_match: subject).
+    per_keyword: clips taken per script keyword (footage_hint terms always get 2) - higher keeps
+    the video on its subject (fact videos: show the octopus, not a galaxy)."""
     if os.environ.get("PEXELS_API_KEY", "").strip():
         key, search, shuffle = env("PEXELS_API_KEY"), _pexels_search, True
     elif os.environ.get("PIXABAY_API_KEY", "").strip():
@@ -134,8 +150,24 @@ def get_footage(keywords, extra_hint, needed_seconds, clip_seconds, folder, used
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     need = int(needed_seconds // clip_seconds) + 1
-    queries = list(keywords) + [h.strip() for h in extra_hint.split(",") if h.strip()]
+    hints = [h.strip() for h in extra_hint.split(",") if h.strip()]
     paths, ids, seen = [], [], set(used_ids)
+    if strict == "subject" and keywords:
+        # fact videos: real clips of the subject itself, even if only a few - the background
+        # cuts different moments from each, which beats padding with unrelated scenery
+        subject = re.findall(r"[a-z]+", keywords[0].lower())[:1]
+        about = [k for k in keywords if re.findall(r"[a-z]+", k.lower())[:1] == subject]
+        sub_paths, sub_ids = get_footage(list(dict.fromkeys(subject + about)), "",
+                                         needed_seconds, clip_seconds, folder, used_ids, orientation,
+                                         exclude, "subject-only", per_keyword)
+        if len(sub_paths) >= 3:
+            return sub_paths, sub_ids
+        paths, ids = list(sub_paths), list(sub_ids)
+        seen |= set(sub_ids)
+        keywords, strict = [], True  # too few: top up from the footage_hint scenery
+    queries = list(keywords) + hints
+    if not queries:
+        return paths, ids
     qi = 0
     while len(paths) < need and qi < len(queries) * 2:
         q = queries[qi % len(queries)]
@@ -145,7 +177,9 @@ def get_footage(keywords, extra_hint, needed_seconds, clip_seconds, folder, used
                        strict)
         if shuffle and not strict:
             random.shuffle(found)
-        for hid, link in found[:2]:  # max 2 clips per search term keeps it varied
+        # max 2 clips per search term keeps it varied (per_keyword for the script's own keywords)
+        take = per_keyword if (qi - 1) % len(queries) < len(keywords) else 2
+        for hid, link in found[:take]:
             name = hid if isinstance(hid, str) else f"pexels_{hid}"
             p = folder / f"{name}.mp4"
             seen.add(hid)
@@ -163,11 +197,14 @@ def get_footage(keywords, extra_hint, needed_seconds, clip_seconds, folder, used
             ids.append(hid)
             if len(paths) >= need:
                 break
+    if strict == "subject-only":  # the caller decides what to do with too few
+        return paths, ids
     # strict search found too few for an unusual topic: top up with the loose search
     enough = max(3, need // 3)
     if strict and len(paths) < enough:
         more, more_ids = get_footage(keywords, extra_hint, (enough - len(paths) - 1) * clip_seconds,
-                                     clip_seconds, folder, list(seen), orientation, exclude, False)
+                                     clip_seconds, folder, list(seen), orientation, exclude, False,
+                                     per_keyword)
         paths, ids = paths + more, ids + more_ids
     if not paths:
         raise RuntimeError("No stock footage found - try different keywords/footage_hint")

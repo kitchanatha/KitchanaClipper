@@ -167,6 +167,11 @@ channels:
     highlight_color: "#3DDCFF"
     youtube_token: tokens/wonder_minute.json
     footage_hint: ocean, deep sea, space, galaxy, volcano, jungle, wild animals, microscope, aurora
+    clips_per_keyword: 6      # mostly footage of the video's subject; the hint above is only backup
+    footage_match: subject    # a clip must be TAGGED with the keyword's first word (octopus, not "underwater")
+    footage_exclude: [ai generated, cartoon, animation, fantasy, monster, alien, kraken,
+                      illustration, drawing, game, toy, person, man, woman, people, face, fair,
+                      fairground, carousel, festival, seafood, food, restaurant, diver, surfer]
     hashtags: ["#facts", "#amazing", "#didyouknow", "#shorts"]
     description_footer: "Follow Wonder Minute for one amazing fact a day."
     style: |
@@ -177,6 +182,9 @@ channels:
       well-documented facts you are certain of: no made-up numbers, no myths, no
       "scientists say" without substance, no exaggeration. End with:
       "Follow for one amazing fact a day."
+      Footage keywords: start EVERY keyword with the main subject as one plain noun, then what
+      it does (e.g. "octopus swimming", "octopus close up", "octopus camouflage") - 4 of the 5
+      keywords about the subject itself.
     # "Popular ideas": most-viewed recent Shorts for these searches -> original topic ideas
     trend_queries: ["amazing facts", "did you know facts", "mind blowing facts", "animal facts",
                     "space facts", "ocean facts"]
