@@ -91,7 +91,9 @@ def generate_one(cfg, key, script_file=None, script=None, folder=None, extra_met
     work = dirs(cfg)["work"] / folder.name
     work.mkdir(parents=True, exist_ok=True)
     try:
-        words = cached_voice(cfg, ch, s["script"], folder / "voice.mp3", voice_cache)
+        # cached per channel: re-making a video (new footage) never pays for the same voice twice
+        words = cached_voice(cfg, ch, s["script"], folder / "voice.mp3",
+                             voice_cache or ROOT / "data" / "voice_cache" / key)
         from pipeline.assemble import duration
         secs = duration(folder / "voice.mp3")
         print(f"[{ch['name']}] finding footage for {secs:.0f}s...")

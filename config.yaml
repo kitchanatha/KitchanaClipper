@@ -171,7 +171,9 @@ channels:
     footage_match: subject    # a clip must be TAGGED with the keyword's first word (octopus, not "underwater")
     footage_exclude: [ai generated, cartoon, animation, fantasy, monster, alien, kraken,
                       illustration, drawing, game, toy, person, man, woman, people, face, fair,
-                      fairground, carousel, festival, seafood, food, restaurant, diver, surfer]
+                      fairground, carousel, festival, seafood, food, restaurant, diver, surfer,
+                      statue, statues, sculpture, sculptures, museum, fountain, monument, garden,
+                      church, religion, god, goddess, greek, roman, marble, artwork, nude]
     hashtags: ["#facts", "#amazing", "#didyouknow", "#shorts"]
     description_footer: "Follow Wonder Minute for one amazing fact a day."
     style: |
