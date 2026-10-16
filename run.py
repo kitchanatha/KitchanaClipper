@@ -225,12 +225,28 @@ def decide(cfg, folder, approve):
     return dest
 
 
+def contact_sheet(video, out, every=3.0, cols=10):
+    """One image with a frame every `every` seconds - a two-second check of the footage."""
+    from pipeline.assemble import duration
+    rows = max(1, -(-int(duration(video) // every + 1) // cols))
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(video), "-vf",
+                    f"fps=1/{every},scale=160:-1,tile={cols}x{rows}", "-frames:v", "1", str(out)],
+                   check=True)
+    return out
+
+
 def auto_upload(cfg, key, folder):
     """Channels with auto_upload: true skip the review step: approve + upload right after
-    making. Returns (url, slot), or None for channels that keep review."""
+    making (a frames.png contact sheet is saved next to the video for a quick check).
+    Returns (url, slot), or None for channels that keep review."""
     if not cfg["channels"][key].get("auto_upload"):
         return None
-    return upload_one(cfg, key, decide(cfg, folder, True))
+    folder = decide(cfg, folder, True)
+    try:
+        contact_sheet(folder / "video.mp4", folder / "frames.png")
+    except Exception as e:  # never block the upload on the preview image
+        print(f"[{key}] contact sheet failed: {e}")
+    return upload_one(cfg, key, folder)
 
 
 def upload_one(cfg, key, folder):

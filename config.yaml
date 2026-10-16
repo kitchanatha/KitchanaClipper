@@ -168,9 +168,12 @@ channels:
     youtube_token: tokens/wonder_minute.json
     footage_hint: ocean, deep sea, space, galaxy, volcano, jungle, wild animals, microscope, aurora
     clips_per_keyword: 6      # mostly footage of the video's subject; the hint above is only backup
+    # licensed stock close-ups of people (an eye, hands, skin) are fine for body facts;
+    # crowds, news / political scenes and celebrities stay blocked
     footage_match: subject    # a clip must be TAGGED with the keyword's first word (octopus, not "underwater")
     footage_exclude: [ai generated, cartoon, animation, fantasy, monster, alien, kraken,
-                      illustration, drawing, game, toy, person, man, woman, people, face, fair,
+                      illustration, drawing, game, toy, crowd, protest, police, politics, news,
+                      celebrity, wedding, party, fair,
                       fairground, carousel, festival, seafood, food, restaurant, diver, surfer,
                       statue, statues, sculpture, sculptures, museum, fountain, monument, garden,
                       church, religion, god, goddess, greek, roman, marble, artwork, nude,

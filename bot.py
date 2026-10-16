@@ -275,11 +275,15 @@ async def run_generate(keys, count, reason, wait=False, idea=None):
                     if cfg["channels"][key].get("auto_upload"):  # no review for this channel
                         try:
                             url, slot = await asyncio.to_thread(core.auto_upload, cfg, key, folder)
-                            m = json.loads((find_video(key, folder.name) / "meta.json").read_text(
-                                encoding="utf-8"))
+                            up = find_video(key, folder.name)
+                            m = json.loads((up / "meta.json").read_text(encoding="utf-8"))
+                            sheet = up / "frames.png"
                             await (await control()).send(
                                 f"**{cfg['channels'][key]['name']}** auto-uploaded: **{m['title']}**\n"
-                                f"{upload_note(slot)}\n{url}", view=CaptionView(key, folder.name))
+                                f"{upload_note(slot)}\n{url}\nFrames every 3 s below - check the "
+                                f"footage before you publish it in Studio.",
+                                file=discord.File(str(sheet), filename="frames.png") if sheet.exists() else None,
+                                view=CaptionView(key, folder.name))
                         except BaseException as e:
                             await say(f"[{key}] made but upload failed: `{str(e)[:300]}` - "
                                       "it is in approved/, tap Upload approved to retry.")
