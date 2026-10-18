@@ -75,6 +75,10 @@ def generate_one(cfg, key, script_file=None, script=None, folder=None, extra_met
     ch = cfg["channels"][key]
     hist = load_history()
     h = hist.setdefault(key, {"topics": [], "pexels_ids": []})
+    if not script and not script_file and idea is None and ch.get("daily_from_ideas"):
+        from pipeline.trends import next_idea  # daily run: next unused popular idea
+        idea = next_idea(cfg, key)
+        print(f"[{ch['name']}] idea: {idea['idea'][:90]}")
     if script:
         s = script
     else:
@@ -114,6 +118,9 @@ def generate_one(cfg, key, script_file=None, script=None, folder=None, extra_met
         h["topics"].append(s.get("topic") or s["title"])
         h["pexels_ids"].extend(ids)
         save_history(hist)
+        if idea:
+            from pipeline.trends import mark_made
+            mark_made(key, idea)
         from pipeline.social import add_social
         print(f"[{ch['name']}] writing Facebook / Instagram captions...")
         add_social(cfg, key, folder)

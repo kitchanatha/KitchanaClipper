@@ -28,7 +28,7 @@ youtube:
   category_id: "22"         # People & Blogs
   contains_synthetic_media: true     # discloses the AI voice to YouTube
 
-daily_count: 1              # videos per channel per daily run
+daily_count: 2              # videos per channel per daily run (fills both publish_times slots)
 
 news:                       # Thai news recaps (สรุปให้ฟัง) - README section 8. Safety rules are in code.
   channel: summed_up
@@ -130,6 +130,7 @@ channels:
     caption_color: "#F2C14E"
     highlight_color: "#FFFFFF"
     youtube_token: tokens/mindset_minute.json
+    auto_upload: true       # no review step: uploads (private) right after it is made
     hook_card: true         # big 2-6 word headline (often a quote-like line) for the first ~2-3 s
     footage_hint: cinematic city, sunrise, focused person, office desk, money, running, mountains
     hashtags: ["#mindset", "#money", "#selfimprovement", "#shorts"]
@@ -149,6 +150,7 @@ channels:
     caption_color: "#F5E9FF"
     highlight_color: "#FFB86B"
     youtube_token: tokens/storytime_cuts.json
+    auto_upload: true       # no review step: uploads (private) right after it is made
     hook_card: true         # big 2-6 word headline (the story's mystery as a question) for the first ~2-3 s
     footage_hint: night city, rain on window, phone screen, empty street, apartment, mysterious hallway
     hashtags: ["#storytime", "#story", "#shorts"]
@@ -197,6 +199,7 @@ channels:
     # "Popular ideas": most-viewed recent Shorts for these searches -> original topic ideas
     auto_upload: true         # no review step: uploads (private) right after it is made
     hook_card: true           # big 2-6 word headline over the best clip for the first ~2-3 s
+    daily_from_ideas: true    # daily run makes the next unused "Popular ideas" topic (new list when used up)
     trend_queries: ["amazing facts", "did you know facts", "mind blowing facts", "animal facts",
                     "space facts", "ocean facts"]
     trend_days: 30

@@ -333,6 +333,9 @@ still needs Approve before upload. Each search uses 100 of YouTube's 10,000 dail
 by adding `auto_upload: true` under it in `config.yaml`; remove it to bring the review step back.
 News (สรุปให้ฟัง) and story videos always keep their review step.
 
+**Daily from ideas:** with `daily_from_ideas: true` the daily run makes the next idea not made yet
+(✅ in the list) and searches for a fresh list when they are used up or a week old.
+
 Setup: create the YouTube channel, then `python run.py auth --channel wonder_minute`. To also make
 one Wonder Minute video in the daily run, add `wonder_minute` to `MACHINE_CHANNELS`.
 

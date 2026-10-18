@@ -114,6 +114,27 @@ def load_ideas(key):
     return json.loads(f.read_text(encoding="utf-8")) if f.exists() else None
 
 
+def next_idea(cfg, key, max_age_days=7, log=print):
+    """For the daily run: the next idea not made yet. Searches for a fresh list when the saved
+    one is used up or older than max_age_days."""
+    data = load_ideas(key)
+    fresh = data and datetime.fromisoformat(data["created"]) > datetime.now() - timedelta(days=max_age_days)
+    if not fresh or all(i.get("made") for i in data["ideas"]):
+        data = find_ideas(cfg, key, log=log)
+    return next(i for i in data["ideas"] if not i.get("made"))
+
+
+def mark_made(key, idea):
+    """Remember that this idea became a video (daily run and Make buttons skip it)."""
+    data = load_ideas(key)
+    if not data or not idea:
+        return
+    for i in data["ideas"]:
+        if i.get("idea") == idea.get("idea"):
+            i["made"] = True
+    ideas_file(key).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def ideas_text(data, limit=1900):
     """Discord / console summary: top popular videos, then the numbered ideas."""
     lines = ["**Most viewed lately** (for reference - we never copy them):"]
@@ -121,5 +142,6 @@ def ideas_text(data, limit=1900):
         lines.append(f"• {v['title'][:70]} - {v['views']:,} views")
     lines.append("\n**Ideas for our own videos** - tap a number to make it:")
     for i, idea in enumerate(data["ideas"], 1):
-        lines.append(f"**{i}.** {idea['idea']}\n    _{idea.get('hook', '')}_")
+        done = " ✅ made" if idea.get("made") else ""
+        lines.append(f"**{i}.** {idea['idea']}{done}\n    _{idea.get('hook', '')}_")
     return "\n".join(lines)[:limit]
