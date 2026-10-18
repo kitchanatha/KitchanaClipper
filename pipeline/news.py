@@ -418,8 +418,12 @@ def build(cfg, slug, force_script=False, log=print, short=False):
     for i, b in enumerate(script["beats"]):
         evs = [events[x] for x in b["event_ids"] if x in events]
         outlets = sorted({o for e in evs for o in e.get("outlets", [])})
+        places = []
+        if data.get("map"):  # cities this beat names -> lit up on the map
+            from .maps import cities_in
+            places = cities_in(data["map"], b["card_text"] + " " + b.get("narration", ""))
         beats.append({"start": starts[f"b{i}"], "date_label": thai_date(evs[0].get("date")) if evs else "",
-                      "card_text": b["card_text"], "outlets": outlets})
+                      "card_text": b["card_text"], "outlets": outlets, "places": places})
     latest = {"start": starts["latest"], "card_text": script["latest"]["card_text"],
               "outlets": data.get("status_outlets") or (beats[-1]["outlets"] if beats else [])}
     bad = check_card_texts(beats, latest)
@@ -441,7 +445,7 @@ def build(cfg, slug, force_script=False, log=print, short=False):
         log("Rendering...")
         temp = make_background(cfg, clips, total, work)
         write_news_ass(work / "news.ass", ch, cfg, script["title"], beats, latest, words, total,
-                       hook_card=script.get("hook_card"))
+                       hook_card=script.get("hook_card"), map_country=data.get("map"))
         finish_video(cfg, work, "news.ass", mp3, total, out_dir / "video.mp4", temp,
                      darken=float(nc.get("darken", 0.55)))
     except BaseException:

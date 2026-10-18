@@ -109,9 +109,10 @@ def compact_row(t0, t1, y, beat, ch):
     ]
 
 
-def write_news_ass(path, ch, cfg, title, beats, latest, words, total, hook_card=None):
-    """beats: [{start, date_label, card_text, outlets}], latest: {start, card_text}.
-    hook_card: 1-2 headline lines for the opening (older scripts without it show the title)."""
+def write_news_ass(path, ch, cfg, title, beats, latest, words, total, hook_card=None, map_country=None):
+    """beats: [{start, date_label, card_text, outlets, places}], latest: {start, card_text}.
+    hook_card: 1-2 headline lines for the opening (older scripts without it show the title).
+    map_country: draw that country under the timeline cards, lighting up each beat's places."""
     accent = ass_color(ch["highlight_color"])
     red = ass_color(ch.get("latest_color", "#E63946"))
     white = ass_color(ch["caption_color"])
@@ -127,6 +128,7 @@ def write_news_ass(path, ch, cfg, title, beats, latest, words, total, hook_card=
         f"Style: Head,{head},54,{white},{white},&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,0,2,7,0,0,0,1",
         f"Style: Title,{head},88,{white},{white},&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,4,3,8,0,0,0,1",
         f"Style: Hook,{head},150,{white},{white},{navy},&H80000000,0,0,0,0,100,100,0,0,1,8,4,8,0,0,0,1",
+        f"Style: MapCity,{head},44,{white},{white},{navy},&H80000000,0,0,0,0,100,100,0,0,1,4,0,7,0,0,0,1",
     ]
     ev = []
     end = total
@@ -159,6 +161,13 @@ def write_news_ass(path, ch, cfg, title, beats, latest, words, total, hook_card=
         for j, p in enumerate(prev):
             ev += compact_row(t0, t1, TOP + ROW * j, p, ch)
         ev += card_events(t0, t1, card_y, b, ch)
+    if map_country and beats:  # where it happened: below the cards while the timeline runs
+        from .maps import map_events
+        spans = [(b["start"], beats[k + 1]["start"] if k + 1 < len(beats) else latest["start"],
+                  b.get("places") or []) for k, b in enumerate(beats)]
+        ev += map_events(map_country, beats[0]["start"], latest["start"], spans,
+                         {"fill": navy, "line": accent, "hot": red, "done": accent, "dot": white},
+                         (W // 2 - 300, 1155, 600, 410))
     # ล่าสุด end card
     lt = {"date_label": "ล่าสุด", "card_text": latest["card_text"], "outlets": latest.get("outlets")}
     ev += card_events(latest["start"], end, 520, lt, ch, latest=True)
