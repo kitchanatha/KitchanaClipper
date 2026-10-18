@@ -28,7 +28,7 @@ youtube:
   category_id: "22"         # People & Blogs
   contains_synthetic_media: true     # discloses the AI voice to YouTube
 
-daily_count: 2              # videos per channel per daily run (fills both publish_times slots)
+daily_count: 1              # videos per channel per daily run
 
 news:                       # Thai news recaps (สรุปให้ฟัง) - README section 8. Safety rules are in code.
   channel: summed_up
