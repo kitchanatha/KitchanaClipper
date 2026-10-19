@@ -48,6 +48,8 @@ news:                       # Thai news recaps (สรุปให้ฟัง) 
     "ศปภ.": "สอปอภอ"
   category_id: "25"         # News & Politics
   publish_times: ["12:00", "18:00"]
+  topics_time: "07:30"      # daily topic finder (Bangkok time); Discord /topics-time changes it
+  topic_searches: 15        # web searches per topic-finder run
   footage_exclude: [face, portrait, man, woman, people, crowd, protest, police, flag, logo,
                     person, human, girl, boy, child, family, couple, worker, businessman, pilot,
                     crew, stewardess, passenger, passengers, traveler, tourist, tourists,

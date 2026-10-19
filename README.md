@@ -310,6 +310,19 @@ confirmation is re-checked and the facts must be approved again. Blocked stories
 Setup: put a Thai voice ID in `config.yaml` -> `summed_up.voice_id`, run `python run.py fonts`
 (Kanit), create the YouTube channel and connect it with `python run.py auth --channel summed_up`.
 
+### Daily topic finder (computer with `MACHINE_NEWS=yes`)
+
+Every day at `news.topics_time` (07:30, change with `/topics-time HH:MM`; `/topics` runs it now)
+Claude searches the credible outlets for what Thai people are talking about in the last 24-48 h and
+returns 6 candidates (`pipeline/topics.py`). The code then drops - no override - anything about the
+monarchy / royal family (flag or any monarchy word), private individuals, minors or crime victims,
+and anything without 2 different credible outlets among URLs the search really returned. Topics
+covered in the last 14 days (`data/news_topics.json` + the `news/` folders) are skipped unless
+there is a major new development (card labelled **อัปเดต**). The best 3 (fresh first, then
+ad-friendliness high > medium > low) are posted as cards with **Make Short**, **Make Short + Long**
+and **Skip**. Make starts the normal flow: research -> your fact approval -> video -> your video
+approval. Each day's run is kept in `data/topics/<date>.json` (cards, dropped + reasons, raw candidates).
+
 ## 9. Popular ideas - Wonder Minute (amazing facts)
 
 Wonder Minute is a normal Shorts channel (one true, amazing fact per video, narrated over stock

@@ -247,6 +247,8 @@ async def on_interaction(inter: discord.Interaction):
         return await handle_news_card(inter, cid)
     if cid.startswith("id:"):
         return await handle_idea(inter, cid)
+    if cid.startswith("tp:"):
+        return await handle_topic(inter, cid)
     if not cid.startswith("fp:"):
         return
     _, action, rest = cid.split(":", 2)
@@ -347,6 +349,11 @@ async def daily_loop():
             state["last_daily"] = today
             save_state(state)
             await run_generate(MY_CHANNELS, None, "daily run", wait=True)
+        if (NEWS_MODE and not state["paused"] and state.get("last_topics") != today
+                and now.strftime("%H:%M") >= topics_time()):
+            state["last_topics"] = today
+            save_state(state)
+            await run_topics("daily topic finder", wait=True)
         await asyncio.sleep(30)
 
 
@@ -363,6 +370,10 @@ def counts():
 
 # ---------------- actions (used by buttons and slash commands) ----------------
 
+def topics_time():
+    return state.get("topics_time") or (cfg.get("news") or {}).get("topics_time", "07:30")
+
+
 def schedule_text():
     """Per channel: on/paused, videos per daily run, publish slots."""
     from pipeline.channels import publish_times
@@ -377,6 +388,9 @@ def schedule_text():
                "manual" if not daily else f"{daily}/day (you pick + approve)")
         rows.append(f"• {c['name']}: {how} · slots {', '.join(times)}")
     gap = cfg["youtube"].get("min_gap_hours", 6)
+    if NEWS_MODE:
+        rows.append(f"• Topic finder (สรุปให้ฟัง): daily at {topics_time()} - 3 cards, you pick")
+    rows.append(f"• Daily run: {state['daily_time']}")
     return "**Schedules**\n" + "\n".join(rows) + f"\n(min {gap} h between videos of one channel)"
 
 
@@ -865,7 +879,7 @@ class TimelineEditModal(discord.ui.Modal, title="Edit the timeline"):
         await post_fact_card(self.slug, data)
 
 
-async def run_news_research(topic, user):
+async def run_news_research(topic, user, want_long=False):
     from pipeline import news
     if job_lock.locked():
         return await say("A job is already running - try again when it finishes.")
@@ -874,6 +888,9 @@ async def run_news_research(topic, user):
         prog = Progress(bot.loop)
         try:
             slug, data = await asyncio.to_thread(news.research, cfg, topic, prog.log)
+            if want_long:  # picked "Make Short + Long" on a topic card
+                data["want_long"] = True
+                news.write_json(news.news_dir(cfg, slug) / "research.json", data)
             await prog.flush()
             await post_fact_card(slug, data)
         except SystemExit as e:  # monarchy refusal etc.
@@ -885,6 +902,85 @@ async def run_news_research(topic, user):
             with open(ROOT / "data" / "errors.log", "a", encoding="utf-8") as f:
                 f.write(f"\n--- {datetime.now()} news research {topic}\n{traceback.format_exc()}")
     await post_panel()
+
+
+# ---------------- daily topic finder (สรุปให้ฟัง) ----------------
+
+def topic_view(day, i):
+    v = discord.ui.View(timeout=None)
+    v.add_item(discord.ui.Button(label="Make Short", custom_id=f"tp:{day}:{i}:s",
+                                 style=discord.ButtonStyle.primary))
+    v.add_item(discord.ui.Button(label="Make Short + Long", custom_id=f"tp:{day}:{i}:sl",
+                                 style=discord.ButtonStyle.success))
+    v.add_item(discord.ui.Button(label="Skip", custom_id=f"tp:{day}:{i}:x",
+                                 style=discord.ButtonStyle.secondary))
+    return v
+
+
+def topic_embed(t, i):
+    from pipeline.topics import card_text
+    ad = (t.get("ad_friendliness") or {}).get("level", "?")
+    color = {"high": 0x2ECC71, "medium": 0xF1C40F}.get(ad, 0xE67E22)
+    title = (f"[{t['label']}] " if t.get("label") else "") + str(t.get("title_th", ""))
+    emb = discord.Embed(title=f"{i}. {title}"[:250], color=color,
+                        description=card_text(t).split("\n", 1)[1][:3900])
+    emb.set_author(name="สรุปให้ฟัง · topic finder")
+    return emb
+
+
+async def run_topics(reason, wait=False):
+    from pipeline.topics import find_topics
+    if job_lock.locked():
+        if not wait:
+            return await say("A job is already running - try again when it finishes.")
+        await say(f"**{MACHINE}**: {reason} is waiting for the running job to finish...")
+    async with job_lock:
+        await say(f"**{MACHINE}**: {reason} - looking for today's Thai topics (web search, no voice)...")
+        prog = Progress(bot.loop)
+        try:
+            data = await asyncio.to_thread(find_topics, cfg, prog.log)
+            await prog.flush()
+        except BaseException as e:
+            await prog.flush()
+            await say(f"❌ topic finder failed: `{str(e)[:400]}`")
+            with open(ROOT / "data" / "errors.log", "a", encoding="utf-8") as f:
+                f.write(f"\n--- {datetime.now()} topics\n{traceback.format_exc()}")
+            return
+    day = datetime.fromisoformat(data["created"]).strftime("%Y%m%d")
+    ch = await control()
+    dropped = "; ".join(f"{d['title'][:40]} ({d['reason']})" for d in data["dropped"][:6])
+    await ch.send(f"**สรุปให้ฟัง - today's topics** ({len(data['topics'])} passed the safety filter). "
+                  f"Make Short / Make Short + Long starts the usual research -> your fact approval -> "
+                  f"video -> your video approval." + (f"\nLeft out: {dropped}"[:1500] if dropped else ""))
+    for i, t in enumerate(data["topics"], 1):
+        await ch.send(embed=topic_embed(t, i), view=topic_view(day, i))
+    await post_panel()
+
+
+async def handle_topic(inter, cid):
+    from pipeline.topics import TOPICS_DIR, mark_covered
+    if not only_control(inter):
+        return await inter.response.send_message("Use the control channel.", ephemeral=True)
+    if not NEWS_MODE:
+        return await inter.response.send_message("News mode is off on this computer.", ephemeral=True)
+    _, day, i, what = cid.split(":")
+    f = TOPICS_DIR / f"{day}.json"
+    try:
+        data = json.loads(f.read_text(encoding="utf-8"))
+        t = data["topics"][int(i) - 1]
+    except (OSError, ValueError, IndexError, KeyError):
+        return await inter.response.send_message("That topic list is gone - run /topics.", ephemeral=True)
+    if t.get("picked"):
+        return await inter.response.send_message(f"Already handled ({t['picked']}).", ephemeral=True)
+    who = inter.user.display_name
+    t["picked"] = {"s": "Short", "sl": "Short + Long", "x": "skipped"}[what] + f" by {who}"
+    f.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    await inter.response.edit_message(content=f"➡️ {t['picked']}", view=None)
+    if what == "x":
+        return
+    mark_covered(t)  # not offered again for 14 days
+    query = f"{t.get('title_th')} ({t.get('topic_en')})"
+    bot.loop.create_task(run_news_research(query, who, want_long=(what == "sl")))
 
 
 async def run_news_build(slug, user):
@@ -1057,6 +1153,26 @@ if NEWS_MODE:
             return await inter.response.send_message("Use the control channel.", ephemeral=True)
         await inter.response.send_message(f"Researching: {topic}")
         bot.loop.create_task(run_news_research(topic, inter.user.display_name))
+
+
+    @bot.tree.command(name="topics", description="Find today's สรุปให้ฟัง topics now (3 cards)")
+    async def topics_cmd(inter: discord.Interaction):
+        if not only_control(inter):
+            return await inter.response.send_message("Use the control channel.", ephemeral=True)
+        await inter.response.send_message("Looking for topics...")
+        bot.loop.create_task(run_topics(f"topic finder run by {inter.user.display_name}"))
+
+    @bot.tree.command(name="topics-time", description="Daily topic finder time (24h, e.g. 07:30)")
+    async def topics_time_cmd(inter: discord.Interaction, time: str):
+        if not only_control(inter):
+            return await inter.response.send_message("Use the control channel.", ephemeral=True)
+        try:
+            t = datetime.strptime(time.strip(), "%H:%M").strftime("%H:%M")
+        except ValueError:
+            return await inter.response.send_message("Use HH:MM, e.g. 07:30", ephemeral=True)
+        state["topics_time"] = t
+        save_state(state)
+        await inter.response.send_message(f"Daily topic finder set to {t}.")
 
 
 if __name__ == "__main__":
