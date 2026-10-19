@@ -23,12 +23,13 @@ elevenlabs:
 youtube:
   api_verified: false       # set true only after your Google project passes YouTube's API audit (README step 5)
   privacy: private          # unverified projects can only upload private videos
-  publish_times: ["12:00", "19:00"]  # local times; each video takes the next free slot
+  publish_times: ["12:00", "18:00", "20:30"]  # default slots (Thai prime time); channels can set their own
+  min_gap_hours: 6          # never two videos from the same channel within this many hours
   utc_offset: "+07:00"      # Bangkok
   category_id: "22"         # People & Blogs
   contains_synthetic_media: true     # discloses the AI voice to YouTube
 
-daily_count: 1              # videos per channel per daily run
+daily_count: 1              # default videos per daily run; channels override with their own daily_count
 
 news:                       # Thai news recaps (สรุปให้ฟัง) - README section 8. Safety rules are in code.
   channel: summed_up
@@ -130,7 +131,9 @@ channels:
     caption_color: "#F2C14E"
     highlight_color: "#FFFFFF"
     youtube_token: tokens/mindset_minute.json
-    auto_upload: true       # no review step: uploads (private) right after it is made
+    enabled: false          # paused (files kept): skipped by the daily run and the bot; /channel-enable
+    daily_count: 1
+    publish_times: ["12:00"]
     hook_card: true         # big 2-6 word headline (often a quote-like line) for the first ~2-3 s
     footage_hint: cinematic city, sunrise, focused person, office desk, money, running, mountains
     hashtags: ["#mindset", "#money", "#selfimprovement", "#shorts"]
@@ -150,17 +153,24 @@ channels:
     caption_color: "#F5E9FF"
     highlight_color: "#FFB86B"
     youtube_token: tokens/storytime_cuts.json
-    auto_upload: true       # no review step: uploads (private) right after it is made
-    hook_card: true         # big 2-6 word headline (the story's mystery as a question) for the first ~2-3 s
+    enabled: true
+    daily_count: 1
+    publish_times: ["18:00"]
+    script_seconds: [35, 45]  # short and tight - viewers were swiping away in the first seconds
+    hook_options: true      # 3 opening lines (5-10 words), Claude scores them, the best is spoken first
+    hook_card: sentence     # the spoken hook itself shown big for the first ~2 s
     footage_hint: night city, rain on window, phone screen, empty street, apartment, mysterious hallway
     hashtags: ["#storytime", "#story", "#shorts"]
     description_footer: "This is a fictional story. Follow Storytime Cuts for more."
     style: |
       An ORIGINAL short fictional story told in first person, with a surprising
-      twist. Open with an intriguing first line that creates a question. Keep
-      tension rising; reveal the twist in the final lines. About real-feeling
-      everyday situations (neighbors, wrong texts, strange coincidences).
-      No violence or gore. Sometimes end with "Follow for part 2."
+      twist. The FIRST sentence is the hook: 5-10 words, spoken in under 2 seconds,
+      creating an open question (e.g. "My neighbor left me a key and a warning.").
+      NO scene-setting before the hook - no "So", no "Last year", no names or places
+      first. Then keep tension rising and END ON THE REVEAL in the final lines.
+      About real-feeling everyday situations (neighbors, wrong texts, strange
+      coincidences). No violence or gore. Never say "Follow for part 2" (no part 2s
+      are planned); end with "Follow for more stories."
 
   wonder_minute:
     name: Wonder Minute
@@ -170,6 +180,10 @@ channels:
     caption_color: "#FFFFFF"
     highlight_color: "#3DDCFF"
     youtube_token: tokens/wonder_minute.json
+    enabled: true
+    daily_count: 2
+    publish_times: ["12:00", "20:30"]   # 8.5 h apart (min_gap_hours)
+    hook_options: true        # 3 spoken first lines (5-10 words, under 2 s), Claude picks the strongest
     footage_hint: ocean, deep sea, space, galaxy, volcano, jungle, wild animals, microscope, aurora
     clips_per_keyword: 6      # mostly footage of the video's subject; the hint above is only backup
     # licensed stock close-ups of people (an eye, hands, skin) are fine for body facts;
@@ -197,7 +211,6 @@ channels:
       it does (e.g. "octopus swimming", "octopus close up", "octopus camouflage") - 4 of the 5
       keywords about the subject itself.
     # "Popular ideas": most-viewed recent Shorts for these searches -> original topic ideas
-    auto_upload: true         # no review step: uploads (private) right after it is made
     hook_card: true           # big 2-6 word headline over the best clip for the first ~2-3 s
     daily_from_ideas: true    # daily run makes the next unused "Popular ideas" topic (new list when used up)
     trend_queries: ["amazing facts", "did you know facts", "mind blowing facts", "animal facts",
@@ -217,6 +230,7 @@ channels:
     caption_color: "#F3E6C8"              # text
     highlight_color: "#F2A541"            # accent
     youtube_token: tokens/candlelit_en.json
+    daily_count: 0          # manual only (story mode)
     footage_hint: candlelight, foggy forest, old house at night, moonlit clouds, fireplace
     hashtags: ["#story", "#audiobook", "#classicstories", "#bedtimestories"]
     description_footer: "Also in English / ภาษาไทย / 中文"
@@ -232,6 +246,7 @@ channels:
     caption_color: "#F3E6C8"
     highlight_color: "#F2A541"
     youtube_token: tokens/candlelit_th.json
+    daily_count: 0
     footage_hint: candlelight, foggy forest, old house at night, moonlit clouds, fireplace
     hashtags: ["#นิทาน", "#เรื่องเล่า", "#หนังสือเสียง", "#เรื่องสั้น"]
     description_footer: "Also in English / ภาษาไทย / 中文"
@@ -247,6 +262,7 @@ channels:
     caption_color: "#F3E6C8"
     highlight_color: "#F2A541"
     youtube_token: tokens/candlelit_zh.json
+    daily_count: 0
     footage_hint: candlelight, foggy forest, old house at night, moonlit clouds, fireplace
     hashtags: ["#故事", "#有声书", "#经典故事", "#睡前故事"]
     description_footer: "Also in English / ภาษาไทย / 中文"
@@ -266,6 +282,7 @@ channels:
     highlight_color: "#FFD60A"            # accent: date pills, dots, current caption word
     latest_color: "#E63946"               # the "ล่าสุด" (latest) dot and pill
     youtube_token: tokens/summed_up.json
+    daily_count: 1          # one Short a day from the topic finder - only topics you pick + approve
     footage_hint: rain on window, water surface, phone screen scrolling, documents on desk, weather radar map, abstract data
     hashtags: ["#สรุปข่าว", "#สรุปดราม่า", "#สรุปให้ฟัง", "#shorts"]
     description_footer: "ติดตามสรุปให้ฟัง เพื่อไม่พลาดเรื่องที่คนพูดถึง"

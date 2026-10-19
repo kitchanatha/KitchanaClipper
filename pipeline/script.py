@@ -79,10 +79,54 @@ def _claude_call(cfg, prompt, max_tokens, system, timeout, effort=None):
         return r.json()
 
 
+HOOKS_EXTRA = """
+HOOK RULE (people swipe away in the first 2 seconds): do NOT put the opening line in "script".
+Instead return:
+- "hook_options": 3 DIFFERENT possible first sentences. Each 5-10 words, spoken in under 2
+  seconds, creating an open question the viewer needs answered (e.g. "My neighbor left me a key
+  and a warning."). No scene-setting, no greeting, no "Did you know".
+- "body": the rest of the narration, which must continue naturally after ANY of the 3 hooks.
+"""
+
+SCORE_PROMPT = """Score these opening lines for a YouTube Short ({name}). People decide in 2 seconds.
+For each: curiosity 1-10 (how badly you need to know what happens next), clarity 1-10 (instantly
+understood, no confusion), and its word count.
+
+{hooks}
+
+Then pick the ONE that will stop the most people from swiping (must be 10 words or fewer).
+
+Reply ONLY JSON: {{"scores": [{{"curiosity": 0, "clarity": 0, "words": 0}}], "best": 1, "why": "one short sentence on why the best one wins"}}"""
+
+
+def choose_hook(options, scores, best=None):
+    """Index of the hook to use: Claude's pick ("best", 1-based) if it is 10 words or fewer
+    (counted here, not trusted from the model); else highest curiosity + clarity among those."""
+    ok = [i for i, h in enumerate(options) if len(h.split()) <= 10] or list(range(len(options)))
+    if isinstance(best, int) and best - 1 in ok:
+        return best - 1
+    return max(ok, key=lambda i: (scores[i].get("curiosity", 0) + scores[i].get("clarity", 0)
+                                  if i < len(scores) else 0, -len(options[i].split())))
+
+
+def pick_hook(cfg, ch, options):
+    """Claude scores the 3 hooks; returns (best, details for the Discord card)."""
+    text = ask_claude(cfg, SCORE_PROMPT.format(
+        name=ch["name"], hooks="\n".join(f"{i + 1}. {h}" for i, h in enumerate(options))),
+        max_tokens=4000, effort="low")
+    m = re.search(r"\{.*\}", text, re.S)
+    data = json.loads(m.group(0)) if m else {}
+    scores = data.get("scores") or []
+    best = choose_hook(options, scores, data.get("best"))
+    return options[best], {"options": options, "scores": scores, "chosen": best,
+                           "why": data.get("why", "")}
+
+
 def write_script(cfg, ch, recent_topics, idea=None):
-    """idea: a topic picked by the owner (e.g. from the popular-video ideas) - else Claude picks."""
+    """idea: a topic picked by the owner (e.g. from the popular-video ideas) - else Claude picks.
+    Channels with hook_options: true get 3 opening lines, scored, best one spoken first."""
     recent = "\n".join(f"- {t}" for t in recent_topics[-60:]) or "- (none yet)"
-    s_lo, s_hi = cfg["video"].get("script_seconds", [35, 50])
+    s_lo, s_hi = ch.get("script_seconds") or cfg["video"].get("script_seconds", [35, 50])
     prompt = PROMPT.format(
         name=ch["name"], style=ch["style"].strip(),
         language=LANG.get(ch.get("language", "en"), "English"), recent=recent,
@@ -94,11 +138,22 @@ def write_script(cfg, ch, recent_topics, idea=None):
                    + (f"Suggested first line (improve it if you can): {idea['hook']}\n"
                       if idea.get("hook") else "")
                    + "Write the script about exactly this topic.\n")
+    hooks = bool(ch.get("hook_options"))
+    if hooks:
+        prompt += HOOKS_EXTRA
     text = ask_claude(cfg, prompt, max_tokens=8000)
     m = re.search(r"\{.*\}", text, re.S)
     if not m:
         raise RuntimeError(f"Claude did not return JSON:\n{text[:500]}")
     data = json.loads(m.group(0))
+    if hooks:
+        opts = [str(h).strip() for h in data.get("hook_options") or [] if str(h).strip()][:3]
+        if not opts or not data.get("body"):
+            raise RuntimeError("Script is missing 'hook_options' / 'body'")
+        best, data["hook_choice"] = pick_hook(cfg, ch, opts)
+        data["script"] = f"{best} {data.pop('body').strip()}"
+        if ch.get("hook_card") == "sentence":  # on screen: the spoken hook itself
+            data["hook_text"] = best
     for k in ("title", "script", "keywords"):
         if not data.get(k):
             raise RuntimeError(f"Script is missing '{k}'")

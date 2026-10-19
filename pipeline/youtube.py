@@ -64,21 +64,26 @@ def auth(ch):
 
 
 def next_slot(cfg, key, times=None):
-    """Next free publish time for this channel (one video per slot)."""
+    """Next free publish time for this channel: one video per slot, the channel's own
+    publish_times (else `times` / the global ones), and at least youtube.min_gap_hours between
+    two videos of the same channel."""
+    from .channels import publish_times
     yc = cfg["youtube"]
     sign = 1 if yc["utc_offset"][0] == "+" else -1
     hh, mm = map(int, yc["utc_offset"][1:].split(":"))
     tz = timezone(sign * timedelta(hours=hh, minutes=mm))
     taken = json.loads(SCHEDULE.read_text()) if SCHEDULE.exists() else {}
     used = set(taken.get(key, []))
+    used_dt = [datetime.fromisoformat(u) for u in used]
+    gap = timedelta(hours=float(yc.get("min_gap_hours", 6)))
     now = datetime.now(tz) + timedelta(minutes=30)
     day = now.date()
     for _ in range(60):
-        for t in sorted(times or yc["publish_times"]):
+        for t in sorted(publish_times(cfg, key, times)):
             h, m = map(int, t.split(":"))
             slot = datetime(day.year, day.month, day.day, h, m, tzinfo=tz)
             iso = slot.isoformat()
-            if slot > now and iso not in used:
+            if slot > now and iso not in used and all(abs(slot - u) >= gap for u in used_dt):
                 taken.setdefault(key, []).append(iso)
                 SCHEDULE.parent.mkdir(parents=True, exist_ok=True)
                 SCHEDULE.write_text(json.dumps(taken, indent=2))

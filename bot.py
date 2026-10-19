@@ -18,6 +18,7 @@ from discord import app_commands
 
 import run as core
 from pipeline.common import load_config, env, ROOT
+from pipeline import channels as chans
 
 cfg = load_config()
 
@@ -211,6 +212,10 @@ async def post_card(folder):
                         color=0x3D1E6D)
     emb.set_author(name=f"{meta['channel_name']}  ·  {MACHINE}")
     emb.set_footer(text=f"{meta['length_sec']}s  ·  {folder.name}")
+    hc = meta.get("hook_choice")
+    if hc:
+        emb.add_field(name="Hook options (curiosity / clarity)", value=hook_options_text(hc)[:1020],
+                      inline=False)
     preview = await asyncio.to_thread(make_preview, folder)
     ch = await control()
     kwargs = {"embed": emb, "view": ReviewView(key, folder.name)}
@@ -219,6 +224,18 @@ async def post_card(folder):
     else:
         emb.add_field(name="Preview", value="Too large for Discord - check the review folder.")
     await ch.send(**kwargs)
+
+
+def hook_options_text(hc):
+    lines = []
+    for i, h in enumerate(hc.get("options", [])):
+        sc = (hc.get("scores") or [{}] * 3)[i] if i < len(hc.get("scores") or []) else {}
+        mark = "✅" if i == hc.get("chosen") else "▫️"
+        lines.append(f"{mark} {h}  ({sc.get('curiosity', '?')}/{sc.get('clarity', '?')}, "
+                     f"{len(h.split())} words)")
+    if hc.get("why"):
+        lines.append(f"_Why: {hc['why']}_")
+    return "\n".join(lines)
 
 
 @bot.event
@@ -269,16 +286,23 @@ def upload_warnings(key, name):
 # ---------------- jobs ----------------
 
 async def run_generate(keys, count, reason, wait=False, idea=None):
+    """count=None: each channel's own daily_count (the daily run). Paused channels are skipped."""
+    keys = [k for k in keys if chans.enabled(cfg, k)]
+    plan = {k: (chans.daily_count(cfg, k) if count is None else count) for k in keys}
+    keys = [k for k in keys if plan[k] > 0]
+    if not keys:
+        return await say(f"**{MACHINE}**: {reason} - no enabled channels to make.")
     if job_lock.locked():
         if not wait:
             await say("A job is already running - try again when it finishes.")
             return
         await say(f"**{MACHINE}**: {reason} is waiting for the running job to finish...")
     async with job_lock:
-        await say(f"**{MACHINE}**: {reason} - making {count} video(s) for {', '.join(keys)}...")
+        await say(f"**{MACHINE}**: {reason} - making "
+                  + ", ".join(f"{plan[k]} for {cfg['channels'][k]['name']}" for k in keys) + "...")
         made, failed = 0, 0
         for key in keys:
-            for _ in range(count):
+            for _ in range(plan[key]):
                 try:
                     folder = await asyncio.to_thread(core.generate_one, cfg, key, idea=idea)
                     made += 1
@@ -312,8 +336,8 @@ async def run_generate(keys, count, reason, wait=False, idea=None):
 
 async def daily_loop():
     await bot.wait_until_ready()
-    await say(f"**{MACHINE}** online. Channels: {', '.join(MY_CHANNELS)}. "
-              f"Daily run at {state['daily_time']}{' (PAUSED)' if state['paused'] else ''}.")
+    await say(f"**{MACHINE}** online. Daily run at {state['daily_time']}"
+              f"{' (PAUSED)' if state['paused'] else ''}.\n{schedule_text()}")
     await post_panel()
     while not bot.is_closed():
         now = datetime.now()
@@ -322,7 +346,7 @@ async def daily_loop():
                 and now.strftime("%H:%M") >= state["daily_time"]):
             state["last_daily"] = today
             save_state(state)
-            await run_generate(MY_CHANNELS, int(cfg.get("daily_count", 1)), "daily run", wait=True)
+            await run_generate(MY_CHANNELS, None, "daily run", wait=True)
         await asyncio.sleep(30)
 
 
@@ -339,10 +363,28 @@ def counts():
 
 # ---------------- actions (used by buttons and slash commands) ----------------
 
+def schedule_text():
+    """Per channel: on/paused, videos per daily run, publish slots."""
+    from pipeline.channels import publish_times
+    rows = []
+    for k in REVIEW_KEYS:
+        c = cfg["channels"][k]
+        on = chans.enabled(cfg, k)
+        times = publish_times(cfg, k, (cfg.get("news") or {}).get("publish_times")
+                              if c.get("type") == "news" else None)
+        daily = chans.daily_count(cfg, k)
+        how = ("paused" if not on else f"{daily}/day" if k in MY_CHANNELS and daily else
+               "manual" if not daily else f"{daily}/day (you pick + approve)")
+        rows.append(f"• {c['name']}: {how} · slots {', '.join(times)}")
+    gap = cfg["youtube"].get("min_gap_hours", 6)
+    return "**Schedules**\n" + "\n".join(rows) + f"\n(min {gap} h between videos of one channel)"
+
+
 def status_text():
     busy = "working on a job" if job_lock.locked() else "idle"
     return (f"**{MACHINE}** is {busy}{' · PAUSED' if state['paused'] else ''}\n"
-            f"Daily run: {state['daily_time']} · Last: {state['last_result']}\n{counts()}")
+            f"Daily run: {state['daily_time']} · Last: {state['last_result']}\n{counts()}\n"
+            f"{schedule_text()}")
 
 
 async def do_generate(inter, keys, count=1):
@@ -471,7 +513,7 @@ def panel_view():
 
 def channel_picker_view():
     v = discord.ui.View(timeout=300)
-    for k in MY_CHANNELS:
+    for k in [k for k in MY_CHANNELS if chans.enabled(cfg, k)]:
         v.add_item(discord.ui.Button(label=cfg["channels"][k]["name"], custom_id=f"cp:gen:{k}",
                                      style=discord.ButtonStyle.primary))
     if len(MY_CHANNELS) > 1:
@@ -918,6 +960,27 @@ async def status(inter: discord.Interaction):
 async def generate(inter: discord.Interaction, channel: app_commands.Choice[str], count: int = 1):
     keys = MY_CHANNELS if channel.value == "all" else [channel.value]
     await guarded(inter, do_generate, keys, count)
+
+
+SHORTS_CHOICES = [app_commands.Choice(name=cfg["channels"][k]["name"], value=k) for k in MY_CHANNELS]
+
+
+@bot.tree.command(name="channel-enable", description="Turn a channel's daily videos back on")
+@app_commands.choices(channel=SHORTS_CHOICES)
+async def channel_enable(inter: discord.Interaction, channel: app_commands.Choice[str]):
+    async def go(i):
+        chans.set_enabled(channel.value, True)
+        await i.response.send_message(f"**{channel.name}** enabled.\n{schedule_text()}")
+    await guarded(inter, go)
+
+
+@bot.tree.command(name="channel-disable", description="Pause a channel (kept, skipped by the daily run)")
+@app_commands.choices(channel=SHORTS_CHOICES)
+async def channel_disable(inter: discord.Interaction, channel: app_commands.Choice[str]):
+    async def go(i):
+        chans.set_enabled(channel.value, False)
+        await i.response.send_message(f"**{channel.name}** paused.\n{schedule_text()}")
+    await guarded(inter, go)
 
 
 @bot.tree.command(description="Re-post videos waiting for review")

@@ -80,8 +80,8 @@ def hook_end(words, lo=1.5, hi=4.0):
     return hi
 
 
-def hook_lines(text, width=13):
-    """Split the headline into at most 3 short lines (English: by words)."""
+def hook_lines(text, width=13, max_lines=3):
+    """Split the headline into short lines (English: by words)."""
     out, cur = [], ""
     for w in str(text).split():
         if cur and len(cur) + 1 + len(w) > width:
@@ -89,7 +89,17 @@ def hook_lines(text, width=13):
             cur = w
         else:
             cur = f"{cur} {w}".strip()
-    return (out + [cur])[:3] if cur else out[:3]
+    return (out + [cur])[:max_lines] if cur else out[:max_lines]
+
+
+def hook_layout(text):
+    """(lines, font scale): short headlines big; a whole hook sentence (up to ~10 words) smaller
+    so it still fits in at most 4 lines."""
+    for width, scale in ((13, 1.0), (16, 0.82), (20, 0.66)):
+        full = hook_lines(text, width, 99)
+        if len(full) <= (3 if width == 13 else 4):
+            return full, scale
+    return hook_lines(text, 20, 4), 0.66
 
 
 def hook_events(hook, words, ch, cfg):
@@ -98,7 +108,10 @@ def hook_events(hook, words, ch, cfg):
     end = hook_end(words)
     hi, base = _ass_color(ch["highlight_color"]), _ass_color(ch["caption_color"])
     pop = r"\fscx70\fscy70\t(0,160,\fscx108\fscy108)\t(160,280,\fscx100\fscy100)\fad(0,200)"
-    ls = hook_lines(hook.upper() if ch.get("language", "en") == "en" else hook)
+    ls, scale = hook_layout(hook.upper() if ch.get("language", "en") == "en" else hook)
+    pop = pop.replace(r"\fscx100\fscy100", rf"\fscx{100 * scale:.0f}\fscy{100 * scale:.0f}") \
+             .replace(r"\fscx108\fscy108", rf"\fscx{108 * scale:.0f}\fscy{108 * scale:.0f}") \
+             .replace(r"\fscx70\fscy70", rf"\fscx{70 * scale:.0f}\fscy{70 * scale:.0f}")
     text = r"\N".join((r"{\c" + hi + "&}" if i % 2 == 0 else r"{\c" + base + "&}") + _clean(x)
                       for i, x in enumerate(ls))
     return [f"Dialogue: 5,{_ts(0)},{_ts(end)},Hook,,0,0,0,,"

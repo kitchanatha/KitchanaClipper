@@ -339,6 +339,23 @@ News (สรุปให้ฟัง) and story videos always keep their review 
 Setup: create the YouTube channel, then `python run.py auth --channel wonder_minute`. To also make
 one Wonder Minute video in the daily run, add `wonder_minute` to `MACHINE_CHANNELS`.
 
+## 10. Channel focus and hooks
+
+Per channel in `config.yaml`:
+
+| Setting | What |
+|---|---|
+| `enabled: false` | paused: files kept, skipped by the daily run and the Make video picker. Discord `/channel-enable` / `/channel-disable` override it (saved in `data/channel_state.json`). |
+| `daily_count: 2` | videos per daily run (global `daily_count` is the default; `0` = manual only) |
+| `publish_times: ["12:00", "20:30"]` | this channel's publish slots; `youtube.min_gap_hours` (6) keeps two videos of one channel apart |
+| `script_seconds: [35, 45]` | spoken length for this channel (else `video.script_seconds`) |
+| `hook_options: true` | the script comes with 3 opening lines (5-10 words, under 2 s, an open question); Claude scores curiosity / clarity and picks one (10 words max, checked in code). The review card lists all 3 with scores and why. |
+| `hook_card: true` / `sentence` | big headline for the first ~2 s: a 2-6 word line, or (`sentence`) the spoken hook itself |
+
+Current plan: Mindset Minute paused · Wonder Minute 2/day (12:00, 20:30) · Storytime Cuts 1/day
+(18:00, 35-45 s, hook first, ends on the reveal) · สรุปให้ฟัง 1/day from the topic finder (you pick +
+approve) · Candlelit manual. Every video waits for **Approve** in Discord before upload.
+
 ## Files
 
 | Path | What |

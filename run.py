@@ -168,10 +168,15 @@ def load_script(path):
 
 
 def cmd_generate(cfg, channel, count, script_file=None):
+    """count=None (the daily run): each channel's own daily_count; paused channels make none."""
+    from pipeline.channels import daily_count, enabled
     check_ffmpeg()
     failures = 0
     for key in channel_keys(cfg, channel, shorts_only=True):
-        for _ in range(count):
+        if not enabled(cfg, key):
+            print(f"[{key}] paused (enabled: false) - skipped")
+            continue
+        for _ in range(daily_count(cfg, key) if count is None else count):
             try:
                 up = auto_upload(cfg, key, generate_one(cfg, key, script_file))
                 if up:
@@ -376,7 +381,7 @@ def main():
         from pipeline.trends import find_ideas, ideas_text
         print(ideas_text(find_ideas(cfg, a.channel), limit=100000).replace("**", ""))
     elif a.command == "daily":
-        cmd_generate(cfg, a.channel, int(cfg.get("daily_count", 1)))
+        cmd_generate(cfg, a.channel, None)
     elif a.command == "review":
         cmd_review(cfg)
     elif a.command == "upload":
