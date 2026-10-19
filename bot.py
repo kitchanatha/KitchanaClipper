@@ -20,6 +20,16 @@ import run as core
 from pipeline.common import load_config, env, ROOT
 
 cfg = load_config()
+
+# One bot per computer: a second copy would run every daily job and button press twice
+# (duplicate videos and uploads). Holding a local port is released automatically on exit/crash.
+import socket  # noqa: E402
+_SINGLE = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+try:
+    _SINGLE.bind(("127.0.0.1", 47831))
+except OSError:
+    raise SystemExit("The bot is already running on this computer - not starting a second copy.")
+
 TOKEN = env("DISCORD_BOT_TOKEN")
 GUILD = discord.Object(id=int(env("DISCORD_SERVER_ID")))
 CONTROL = int(env("DISCORD_CONTROL_CHANNEL_ID"))
