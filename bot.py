@@ -51,7 +51,11 @@ NEWS_KEYS = [cfg["news"]["channel"]] if NEWS_MODE and cfg.get("news") else []
 # "Popular ideas" (channels with trend_queries) run on the computer with MACHINE_IDEAS=yes
 IDEAS_MODE = os.environ.get("MACHINE_IDEAS", "").strip().lower() in ("1", "yes", "true", "on")
 IDEA_KEYS = [k for k, c in cfg["channels"].items() if c.get("trend_queries")] if IDEAS_MODE else []
-REVIEW_KEYS = list(dict.fromkeys(MY_CHANNELS + STORY_KEYS + NEWS_KEYS + IDEA_KEYS))
+# Screen-recorded tutorial channels (Prompt Minute): review + upload here, made by hand (not in the
+# daily run or Make video - each tip needs a recording)
+TUTORIAL_KEYS = ([k for k, c in cfg["channels"].items() if c.get("type") == "tutorial"]
+                 if IDEAS_MODE or NEWS_MODE else [])
+REVIEW_KEYS = list(dict.fromkeys(MY_CHANNELS + STORY_KEYS + NEWS_KEYS + IDEA_KEYS + TUTORIAL_KEYS))
 
 STATE = ROOT / "data" / f"bot_state_{MACHINE}.json"
 AUTO = cfg.get("automation", {})
