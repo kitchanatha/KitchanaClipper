@@ -386,6 +386,40 @@ Current plan: Mindset Minute paused · Wonder Minute 2/day (12:00, 20:30) · Sto
 (18:00, 35-45 s, hook first, ends on the reveal) · สรุปให้ฟัง 1/day from the topic finder (you pick +
 approve) · Candlelit manual. Every video waits for **Approve** in Discord before upload.
 
+## 11. Cross-posting and the weekly report
+
+**Cross-post pack (every upload):** after a video is approved and uploaded to YouTube, the bot
+writes `output/crosspost/<channel>/<date>_<folder>/` with `video.mp4` and `caption_<lang>.txt`
+(a Facebook / Instagram caption, a short TikTok caption with hashtags, and for news a
+"แหล่งข่าว: ..." line). The Discord upload message shows the folder. TikTok is never posted
+automatically: its API only allows private posts until TikTok audits your app - upload the pack.
+
+**Facebook Reels + Instagram Reels (optional):** posted through Meta's official Graph API right
+after the YouTube upload - only after your Approve, only for channels switched on in
+`config.yaml` -> `crosspost.channels`, and only with tokens in `.env`. Note: Reels go public at
+once, while the YouTube video waits private for you to schedule it.
+
+Setup (once per channel - you do the account steps, never paste tokens in chat):
+1. Instagram: switch the account to **Business** or **Creator** and link it to the channel's
+   Facebook **Page** (Instagram settings -> Account type / Linked accounts).
+2. https://developers.facebook.com -> **Create app** (type "Business"), add the products
+   **Facebook Login for Business** and **Instagram**.
+3. Graph API Explorer: pick your app, add permissions `pages_show_list`, `pages_manage_posts`,
+   `pages_read_engagement`, `instagram_basic`, `instagram_content_publish`, generate a **user
+   token**, then call `GET /me/accounts` and copy your Page's `id` and `access_token` (a Page
+   token made from a long-lived user token does not expire).
+4. `GET /<page-id>?fields=instagram_business_account` -> the Instagram account `id`.
+5. Put them in `.env` (key in upper case): `META_PAGE_ID_SUMMED_UP=`, `META_PAGE_TOKEN_SUMMED_UP=`,
+   `META_IG_ID_SUMMED_UP=`, then set `facebook: true` / `instagram: true` for that channel.
+   While the app is in development mode it can post to Pages / accounts you administer.
+
+**Weekly report:** every Monday 09:00 (`report:` in config; `/report` in Discord or
+`python run.py report` any time) - per channel the last 7 days' videos with views, likes and
+comments, subscribers, top 3 / bottom 3 and one suggested change; rows are appended to
+`data/weekly_stats.csv`. Average % viewed needs YouTube Analytics: run
+`python run.py auth-analytics --channel <key>` once per channel - it saves a separate read-only
+token (`tokens/<key>_analytics.json`), so the upload sign-ins are not touched.
+
 ## Files
 
 | Path | What |

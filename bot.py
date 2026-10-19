@@ -279,10 +279,11 @@ async def on_interaction(inter: discord.Interaction):
 def upload_warnings(key, name):
     meta_f = Path(cfg["output_dir"]) / "uploaded" / key / name / "meta.json"
     try:
-        warns = json.loads(meta_f.read_text(encoding="utf-8")).get("upload_warnings", [])
+        m = json.loads(meta_f.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return ""
-    return "".join(f"\n⚠️ {w}" for w in warns)
+    return ("".join(f"\n⚠️ {w}" for w in m.get("upload_warnings", []))
+            + "".join(f"\n{n}" for n in m.get("crosspost", [])))
 
 
 # ---------------- jobs ----------------
@@ -349,6 +350,12 @@ async def daily_loop():
             state["last_daily"] = today
             save_state(state)
             await run_generate(MY_CHANNELS, None, "daily run", wait=True)
+        rep = cfg.get("report") or {}
+        if (rep.get("enabled", True) and now.strftime("%A").lower() == str(rep.get("weekday", "monday")).lower()
+                and now.strftime("%H:%M") >= rep.get("time", "09:00") and state.get("last_report") != today):
+            state["last_report"] = today
+            save_state(state)
+            await run_report("weekly report")
         if (NEWS_MODE and not state["paused"] and state.get("last_topics") != today
                 and now.strftime("%H:%M") >= topics_time()):
             state["last_topics"] = today
@@ -391,6 +398,9 @@ def schedule_text():
     if NEWS_MODE:
         rows.append(f"• Topic finder (สรุปให้ฟัง): daily at {topics_time()} - 3 cards, you pick")
     rows.append(f"• Daily run: {state['daily_time']}")
+    rep = cfg.get("report") or {}
+    if rep.get("enabled", True):
+        rows.append(f"• Weekly report: {str(rep.get('weekday', 'monday')).title()} {rep.get('time', '09:00')}")
     return "**Schedules**\n" + "\n".join(rows) + f"\n(min {gap} h between videos of one channel)"
 
 
@@ -905,6 +915,18 @@ async def run_news_research(topic, user, want_long=False, wait=False):
     await post_panel()
 
 
+# ---------------- weekly report ----------------
+
+async def run_report(reason):
+    from pipeline.report import summary, weekly
+    await say(f"**{MACHINE}**: {reason} - reading YouTube stats...")
+    try:
+        data = await asyncio.to_thread(weekly, cfg, REVIEW_KEYS)
+        await say(summary(data))
+    except BaseException as e:
+        await say(f"❌ report failed: `{str(e)[:400]}`")
+
+
 # ---------------- daily topic finder (สรุปให้ฟัง) ----------------
 
 def topic_view(day, i):
@@ -1083,6 +1105,14 @@ async def channel_disable(inter: discord.Interaction, channel: app_commands.Choi
     async def go(i):
         chans.set_enabled(channel.value, False)
         await i.response.send_message(f"**{channel.name}** paused.\n{schedule_text()}")
+    await guarded(inter, go)
+
+
+@bot.tree.command(description="Last-7-day YouTube stats for this computer's channels")
+async def report(inter: discord.Interaction):
+    async def go(i):
+        await i.response.send_message("Reading stats...")
+        bot.loop.create_task(run_report(f"report for {i.user.display_name}"))
     await guarded(inter, go)
 
 

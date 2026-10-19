@@ -58,6 +58,7 @@ news:                       # Thai news recaps (สรุปให้ฟัง) 
   long_darken: 0.6
   long_closing: "กดติดตามสรุปให้ฟัง แล้วพบกันในเรื่องต่อไป"
   footage_exclude: [face, portrait, man, woman, people, crowd, protest, police, flag, logo,
+                    bitcoin, crypto, cryptocurrency, ethereum,
                     person, human, girl, boy, child, family, couple, worker, businessman, pilot,
                     crew, stewardess, passenger, passengers, traveler, tourist, tourists,
                     worried, panic, stress, anxiety, sad, happy, emotion, beard, war, conflict,
@@ -89,6 +90,22 @@ social:                     # Facebook + Instagram captions for every video (Dis
     candlelit_en: ""
     summed_up: "@สรุปให้ฟังOfficial"
     wonder_minute: ""
+
+crosspost:                  # after a video is approved AND uploaded to YouTube
+  pack: true                # output/crosspost/<channel>/<date>_<slug>/: video.mp4 + caption_<lang>.txt
+  dir: output/crosspost     # (Facebook/Instagram caption + short TikTok caption, sources for news)
+  graph_version: v23.0      # Meta Graph API version
+  channels:                 # direct posting via Meta's API - needs the tokens in .env (README 11)
+    summed_up: {facebook: false, instagram: false}
+    wonder_minute: {facebook: false, instagram: false}
+    storytime_cuts: {facebook: false, instagram: false}
+  # TikTok is never posted automatically (its API only allows private posts until TikTok audits
+  # your app) - use the pack.
+
+report:                     # weekly YouTube stats in Discord + data/weekly_stats.csv
+  enabled: true
+  weekday: monday
+  time: "09:00"
 
 automation:                 # used by the Discord bot (bot.py)
   daily_time: "01:30"       # this computer's local time; change from Discord with /settime

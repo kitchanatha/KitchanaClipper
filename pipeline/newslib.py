@@ -305,5 +305,7 @@ def sources_block(research, used_urls=None):
         if used_urls is not None and s.get("url") not in used_urls:
             continue
         date = thai_date(s.get("date"), with_year=True) if s.get("date") else ""
-        lines.append(f"• {s.get('outlet', '')}: {s.get('title', '')} ({date}) {s.get('url', '')}")
+        title = (s.get("title") or "").strip()
+        lines.append(f"• {s.get('outlet', '')}: " + (f"{title} " if title else "")
+                     + (f"({date}) " if date else "") + s.get("url", ""))
     return "\n".join(lines)

@@ -9,6 +9,8 @@
   python run.py generate --channel X --script my_script.json   use your own script (skips Claude)
   python run.py ideas --channel wonder_minute                   popular Shorts -> numbered original ideas
   python run.py generate --channel wonder_minute --idea 3       make idea 3 from that list
+  python run.py report                                          last-7-day stats -> data/weekly_stats.csv
+  python run.py auth-analytics --channel summed_up              optional: avg % viewed in the report
 
 Story mode (Candlelit Tales, README section 7):
   python run.py story-check the-monkeys-paw                     validate rights + show length / cost
@@ -283,6 +285,12 @@ def upload_one(cfg, key, folder):
     dest = dirs(cfg)["uploaded"] / key / folder.name
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(folder), str(dest))
+    try:  # cross-post pack + optional Facebook / Instagram (never undoes the YouTube upload)
+        from pipeline.crosspost import crosspost
+        for note in crosspost(cfg, key, dest, url):
+            print(f"[{key}] {note}")
+    except Exception as e:
+        print(f"[{key}] cross-post skipped: {e}")
     return url, slot
 
 
@@ -343,7 +351,7 @@ def main():
     ap.add_argument("command", choices=["generate", "daily", "review", "upload", "auth", "test-video",
                                         "story-check", "story-prep", "story-build", "fonts",
                                         "news-research", "news-show", "news-approve", "news-build",
-                                        "ideas"])
+                                        "ideas", "report", "auth-analytics"])
     ap.add_argument("slug", nargs="?", help="story folder name (story-* commands)")
     ap.add_argument("--lang", help="story languages, e.g. en or en,th,zh (default: all in config)")
     ap.add_argument("--yes", action="store_true", help="story-build: don't ask before paying for audio")
@@ -379,6 +387,15 @@ def main():
         if a.script and (not a.channel or a.count != 1):
             sys.exit("--script needs --channel and makes one video")
         cmd_generate(cfg, a.channel, a.count, a.script)
+    elif a.command == "report":
+        from pipeline.report import summary, weekly
+        print(summary(weekly(cfg, [a.channel] if a.channel else list(cfg["channels"])), limit=100000)
+              .replace("**", ""))
+    elif a.command == "auth-analytics":
+        if not a.channel:
+            sys.exit("Use --channel, e.g. python run.py auth-analytics --channel summed_up")
+        from pipeline.report import auth_analytics
+        auth_analytics(cfg["channels"][a.channel])
     elif a.command == "ideas":
         if not a.channel:
             sys.exit("Use --channel, e.g. python run.py ideas --channel wonder_minute")
