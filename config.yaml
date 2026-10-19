@@ -243,6 +243,22 @@ channels:
                     "space facts", "ocean facts"]
     trend_days: 30
 
+  prompt_minute:
+    name: Prompt Minute
+    type: tutorial            # screen-recorded AI tips (pipeline/tutorial.py) - not the stock-footage generator
+    language: en
+    enabled: true
+    daily_count: 0            # manual: each tip is recorded in your Chrome with your OK
+    voice_id: bfGb7JTLUnZebZRiFYyq  # Adam (Mindset Minute is paused)
+    font: Anton
+    caption_color: "#FFFFFF"
+    highlight_color: "#3EE8B5"
+    bg_color: "#0F1115"
+    youtube_token: tokens/prompt_minute.json
+    publish_times: ["19:00"]
+    hashtags: ["#ai", "#aitips", "#prompts", "#shorts"]
+    description_footer: "Follow Prompt Minute for one AI trick a day. Demos recorded in incognito chats with made-up details."
+
   # ---------- story-reading channels (story mode only - not used by the daily Shorts run) ----------
 
   candlelit_en:

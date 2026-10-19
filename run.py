@@ -58,7 +58,7 @@ def check_ffmpeg():
 def channel_keys(cfg, only=None, shorts_only=False):
     keys = list(cfg["channels"])
     if shorts_only:  # story / news channels have their own builders, not the Shorts generator
-        keys = [k for k in keys if cfg["channels"][k].get("type") not in ("story", "news")]
+        keys = [k for k in keys if cfg["channels"][k].get("type") not in ("story", "news", "tutorial")]
     if only:
         if only not in keys:
             sys.exit(f"Unknown channel '{only}'. Options: {', '.join(keys)}")

@@ -1,0 +1,22 @@
+{
+  "channel": "prompt_minute",
+  "title": "Why Your AI Answers Are Bland (4-Part Prompt Fix)",
+  "topic": "prompt formula role task format example",
+  "hook_text": "Your AI answers are bland?",
+  "description": "Most AI answers are generic because the prompt is. Use the 4-part formula: role, task, format, example. Demo recorded in an incognito Claude chat with made-up details.",
+  "hashtags": ["#prompting", "#chatgpt", "#claude", "#productivity"],
+  "raw": "raw.mp4",
+  "crop": [1212, 1116, 262, 264],
+  "parts": [
+    {"text": "Your AI answers are bland for one reason. Here's the fix.", "src": [0, 6]},
+    {"text": "Most people type something like: write an email to my boss saying I'll be late. And you get a template full of blanks.",
+     "src": [8, 28], "zoom": [960, 820, 130, 20], "label": "VAGUE PROMPT", "good": false},
+    {"text": "Use the four part formula: role, task, format, and an example.",
+     "src": [30, 36], "dim": true, "card": ["ROLE", "TASK", "FORMAT", "EXAMPLE"]},
+    {"text": "Same email. Tell it who it is, what happened, how long, the format you want, and the tone.",
+     "src": [50, 58], "zoom": [960, 820, 130, 20], "label": "4-PART PROMPT", "good": true},
+    {"text": "Now it's ready to send: a clear subject, the real reason, and a friendly tone.",
+     "src": [58, 66], "zoom": [1060, 520, 70, 540], "label": "RESULT", "good": true},
+    {"text": "Save this formula, and follow Prompt Minute for one AI trick a day.", "src": [66, 72]}
+  ]
+}

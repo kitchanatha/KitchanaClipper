@@ -17,3 +17,5 @@ fonts/NotoSansSC-*.otf
 fonts/NotoSerifSC-*.otf
 # news recaps: recorded voice
 news/*/voice_*
+tutorials/*/raw.mp4
+tutorials/*/voice.*
