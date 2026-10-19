@@ -323,6 +323,23 @@ ad-friendliness high > medium > low) are posted as cards with **Make Short**, **
 and **Skip**. Make starts the normal flow: research -> your fact approval -> video -> your video
 approval. Each day's run is kept in `data/topics/<date>.json` (cards, dropped + reasons, raw candidates).
 
+### Long recaps (16:9, 5-10 min)
+
+**Make Short + Long** on a topic card (or `news-research "<topic>" --long`) researches deeper
+(`news.long_searches`, 12-20 dated events incl. background). After you approve the facts, the bot
+builds the Short and then the long recap (`news-build <folder> --long`, `pipeline/newslong.py`):
+hook -> background ("เรื่องนี้เริ่มจาก...") -> 8-15 timeline beats -> each side -> what happens
+next -> subscribe line, with the same code checks and Claude safety review as the Short. Layout:
+the whole timeline as a column on the left (current beat highlighted), a card on the right,
+sentence subtitles at the bottom (also uploaded as `subtitles.srt`), darkened neutral stock footage,
+an intro title card and a 20 s end screen with room for YouTube's end-screen elements. Thumbnail:
+headline + date pill + timeline motif, no photos. The description has chapters (from the beats)
+and the full source list. It waits for your Approve like every video.
+
+When the Short and the long recap are both uploaded, each description links to the other. The
+YouTube API can't pin comments or set a Short's "related video", so the Discord upload message
+gives you the comment text and tells you to set the related video in Studio.
+
 ## 9. Popular ideas - Wonder Minute (amazing facts)
 
 Wonder Minute is a normal Shorts channel (one true, amazing fact per video, narrated over stock

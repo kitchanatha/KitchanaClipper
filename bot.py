@@ -879,18 +879,19 @@ class TimelineEditModal(discord.ui.Modal, title="Edit the timeline"):
         await post_fact_card(self.slug, data)
 
 
-async def run_news_research(topic, user, want_long=False):
+async def run_news_research(topic, user, want_long=False, wait=False):
+    """wait=True (topic cards): queue behind a running job instead of dropping the request."""
     from pipeline import news
     if job_lock.locked():
-        return await say("A job is already running - try again when it finishes.")
+        if not wait:
+            return await say("A job is already running - try again when it finishes.")
+        await say(f"**{MACHINE}**: research of `{topic[:80]}` is queued behind the running job...")
     async with job_lock:
         await say(f"**{MACHINE}**: researching news topic for {user}: `{topic}` (web search only, no voice)")
         prog = Progress(bot.loop)
         try:
-            slug, data = await asyncio.to_thread(news.research, cfg, topic, prog.log)
-            if want_long:  # picked "Make Short + Long" on a topic card
-                data["want_long"] = True
-                news.write_json(news.news_dir(cfg, slug) / "research.json", data)
+            # "Make Short + Long": deeper research (12-20 events) so the long recap has enough
+            slug, data = await asyncio.to_thread(news.research, cfg, topic, prog.log, want_long)
             await prog.flush()
             await post_fact_card(slug, data)
         except SystemExit as e:  # monarchy refusal etc.
@@ -980,7 +981,7 @@ async def handle_topic(inter, cid):
         return
     mark_covered(t)  # not offered again for 14 days
     query = f"{t.get('title_th')} ({t.get('topic_en')})"
-    bot.loop.create_task(run_news_research(query, who, want_long=(what == "sl")))
+    bot.loop.create_task(run_news_research(query, who, want_long=(what == "sl"), wait=True))
 
 
 async def run_news_build(slug, user):
@@ -993,6 +994,12 @@ async def run_news_build(slug, user):
             out = await asyncio.to_thread(news.build, cfg, slug, False, prog.log)
             await prog.flush()
             await post_card(out)
+            if news.read_json(news.news_dir(cfg, slug) / "research.json").get("want_long"):
+                from pipeline.newslong import build_long
+                await say(f"**{MACHINE}**: now the long recap (16:9, 5-10 min) for `{slug}`...")
+                out = await asyncio.to_thread(build_long, cfg, slug, False, prog.log)
+                await prog.flush()
+                await post_card(out)
         except SystemExit as e:
             await prog.flush()
             await say(f"⛔ {slug}: {e}")

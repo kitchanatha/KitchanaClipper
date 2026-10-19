@@ -110,9 +110,12 @@ def upload(cfg, key, ch, folder):
         slot = next_slot(cfg, key, nc.get("publish_times"))
         desc, tags = meta["description"], meta.get("tags", [])
         category = str(nc.get("category_id", "25"))
-        sibling = _news_sibling(cfg, key, meta)
-        if sibling:  # the other version is already up: link to it at the top
-            desc = _pair_line(meta.get("variant", "full"), sibling[1]["video_id"]) + "\n\n" + desc
+        variant = meta.get("variant", "full")
+        # link to the other version if it is already up (a Short prefers the long recap)
+        sibling = (_news_sibling(cfg, key, meta, {"short", "full"}) if variant == "long" else
+                   _news_sibling(cfg, key, meta, {"long"}) or _news_sibling(cfg, key, meta, {"short", "full"} - {variant}))
+        if sibling:
+            desc = _pair_line(sibling[1].get("variant", "full"), sibling[1]["video_id"]) + "\n\n" + desc
     else:
         slot = next_slot(cfg, key)
         tags = list(dict.fromkeys(ch.get("hashtags", []) + meta.get("hashtags", [])))
@@ -149,10 +152,17 @@ def upload(cfg, key, ch, folder):
     vid = resp["id"]
     meta["video_id"] = vid
     warnings = []
-    if kind == "story":
-        warnings = _story_extras(yt, vid, folder, meta, lang)
-    elif kind == "news" and sibling:
-        warnings = _link_sibling(yt, _creds(ch).scopes, sibling, meta.get("variant", "full"), vid)
+    if kind == "story" or (kind == "news" and meta.get("variant") == "long"):
+        warnings = _story_extras(yt, vid, folder, meta, lang)  # thumbnail + .srt captions
+    if kind == "news" and sibling:
+        warnings += _link_sibling(yt, _creds(ch).scopes, sibling, meta.get("variant", "full"), vid)
+        long_id = vid if meta.get("variant") == "long" else (
+            sibling[1]["video_id"] if sibling[1].get("variant") == "long" else None)
+        if long_id:  # things the API can't do: tell the owner exactly what to click
+            meta["pinned_comment"] = f"ดูฉบับเต็ม (คลิปยาว): https://youtu.be/{long_id}"
+            warnings.append("YouTube's API can't pin comments or set a Short's related video. In Studio, "
+                            f"open the Short -> Related video -> pick the long recap (https://youtu.be/{long_id}), "
+                            f"and pin this comment under the Short: {meta['pinned_comment']}")
     # the video is up - report problems, don't fail (a retry would upload it twice)
     meta["upload_warnings"] = warnings
     (folder / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2),
@@ -162,19 +172,19 @@ def upload(cfg, key, ch, folder):
     return vid, slot
 
 
-PAIR_TEXT = {"full": "▶ ดูฉบับเต็ม: ", "short": "▶ ดูฉบับสั้น: "}
+PAIR_TEXT = {"full": "▶ ดูฉบับเต็ม: ", "short": "▶ ดูฉบับสั้น: ", "long": "▶ ดูฉบับเต็ม (คลิปยาว): "}
 
 
-def _pair_line(this_variant, other_id):
-    """Description line pointing from this version to the other one."""
-    other = "short" if this_variant == "full" else "full"
-    return PAIR_TEXT[other] + f"https://youtu.be/{other_id}"
+def _pair_line(target_variant, target_id):
+    """Description line pointing to the target version."""
+    return PAIR_TEXT.get(target_variant, PAIR_TEXT["full"]) + f"https://youtu.be/{target_id}"
 
 
-def _news_sibling(cfg, key, meta):
-    """The other version (short / full) of the same news topic, if it is already uploaded:
-    (folder, meta) or None. Videos built before short versions existed count as full."""
+def _news_sibling(cfg, key, meta, wanted=None):
+    """Another uploaded version of the same news topic: (folder, meta) or None. wanted: the
+    variants to look for (default: any other). Videos made before variants existed count as full."""
     variant = meta.get("variant", "full")
+    wanted = wanted or ({"short", "full", "long"} - {variant})
     root = Path(cfg["output_dir"]) / "uploaded" / key
     for f in sorted(root.glob("*/meta.json")) if root.exists() else []:
         try:
@@ -182,7 +192,7 @@ def _news_sibling(cfg, key, meta):
         except (OSError, ValueError):
             continue
         if (m.get("kind") == "news" and m.get("news") == meta.get("news") and m.get("video_id")
-                and m.get("variant", "full") != variant):
+                and m.get("variant", "full") in wanted):
             return f.parent, m
     return None
 
@@ -191,8 +201,7 @@ def _link_sibling(yt, scopes, sibling, new_variant, new_id):
     """Adds the new video's link to the top of the already-uploaded other version.
     Returns warnings (with the line to paste by hand if editing isn't possible)."""
     folder, m = sibling
-    other_variant = m.get("variant", "full")
-    line = _pair_line(other_variant, new_id)
+    line = _pair_line(new_variant, new_id)  # the older video points to the new one
     manual = (f"add this line to the top of the description of \"{m['title']}\" in YouTube "
               f"Studio: {line}")
     if "https://www.googleapis.com/auth/youtube.force-ssl" not in (scopes or []):

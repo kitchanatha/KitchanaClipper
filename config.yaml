@@ -50,6 +50,13 @@ news:                       # Thai news recaps (สรุปให้ฟัง) 
   publish_times: ["12:00", "18:00"]
   topics_time: "07:30"      # daily topic finder (Bangkok time); Discord /topics-time changes it
   topic_searches: 15        # web searches per topic-finder run
+  long_searches: 25         # web searches for "Short + Long" research (12-20 events incl. background)
+  long_seconds: [300, 540]  # long recap: 5-9 minutes of narration (+20 s end screen)
+  long_min_beats: 8
+  long_max_beats: 15
+  long_clips: 16            # landscape stock clips behind the long recap (slow crossfades)
+  long_darken: 0.6
+  long_closing: "กดติดตามสรุปให้ฟัง แล้วพบกันในเรื่องต่อไป"
   footage_exclude: [face, portrait, man, woman, people, crowd, protest, police, flag, logo,
                     person, human, girl, boy, child, family, couple, worker, businessman, pilot,
                     crew, stewardess, passenger, passengers, traveler, tourist, tourists,

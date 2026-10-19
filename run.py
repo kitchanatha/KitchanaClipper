@@ -22,6 +22,8 @@ News recaps (สรุปให้ฟัง, README section 8):
   python run.py news-approve <folder>                           approve the facts
   python run.py news-build <folder>                             script + safety review + video
   python run.py news-build <folder> --short                     a 60-85 s short version as well
+  python run.py news-research "<topic>" --long                  deeper research (Short + long recap)
+  python run.py news-build <folder> --long                      the 16:9 5-10 min long recap
 """
 import argparse
 import csv
@@ -357,6 +359,8 @@ def main():
     ap.add_argument("--count", type=int, default=1)
     ap.add_argument("--script", help="JSON file with your own script (generate only, skips Claude)")
     ap.add_argument("--idea", type=int, help="generate: make idea N from the last 'ideas' list")
+    ap.add_argument("--long", action="store_true",
+                    help="news-research: deeper research for a long recap; news-build: the 16:9 long recap")
     a = ap.parse_args()
     cfg = load_config()
     if a.command == "generate" and a.idea:
@@ -402,7 +406,7 @@ def main():
                      else f"Usage: python run.py {a.command} <news-folder>")
         from pipeline import news
         if a.command == "news-research":
-            slug, data = news.research(cfg, a.slug)
+            slug, data = news.research(cfg, a.slug, long=a.long)
             print()
             news.print_table(data)
             print(f"\nNext: check the facts, then  python run.py news-approve {slug}")
@@ -413,7 +417,11 @@ def main():
             print(f"Facts approved. Next:  python run.py news-build {a.slug}")
         else:
             check_ffmpeg()
-            news.build(cfg, a.slug, force_script=a.force, short=a.short)
+            if a.long:
+                from pipeline.newslong import build_long
+                build_long(cfg, a.slug, force_script=a.force)
+            else:
+                news.build(cfg, a.slug, force_script=a.force, short=a.short)
     elif a.command.startswith("story-"):
         if not a.slug:
             sys.exit(f"Usage: python run.py {a.command} <story-folder>")

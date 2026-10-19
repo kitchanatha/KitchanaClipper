@@ -56,6 +56,12 @@ Finish with ONLY this JSON inside <research></research> tags (Thai text in the *
   "last_updated": "YYYY-MM-DD"}}
 Only use URLs you actually found with the search tool."""
 
+LONG_RESEARCH = """
+LONG VERSION: this research also feeds a 5-10 minute recap video, so go deeper. Find 12-20
+dated events: the background (how it started, earlier months / years if relevant), the full
+recent timeline, each side's position, and what happens next (announced dates, deadlines).
+Every event still needs every outlet URL that reported it."""
+
 SCRIPT_PROMPT = """Write a Thai YouTube Shorts script for the channel "{channel}" (neutral news \
 recaps). Spoken length {s_lo}-{s_hi} seconds (about {c_lo}-{c_hi} Thai characters of narration in \
 total).
@@ -136,7 +142,15 @@ def _json_in(text, tag=None):
     return json.loads(m.group(0))
 
 
-def claude_web_research(cfg, prompt, domains, max_uses=10, log=print, finish_tag="research"):
+def _finished_blocks(content):
+    """Drop search calls whose results never arrived (a reply cut off mid-search): the API
+    rejects a continuation that contains a tool call without its result."""
+    done = {b.get("tool_use_id") for b in content if b.get("type") == "web_search_tool_result"}
+    return [b for b in content if b.get("type") != "server_tool_use" or b.get("id") in done]
+
+
+def claude_web_research(cfg, prompt, domains, max_uses=10, log=print, finish_tag="research",
+                        max_tokens=16000):
     """Claude + server-side web search, limited to the credible outlets. Returns
     (final text, verified result URLs, cited texts)."""
     headers = {"x-api-key": env("ANTHROPIC_API_KEY"), "anthropic-version": "2023-06-01",
@@ -148,7 +162,7 @@ def claude_web_research(cfg, prompt, domains, max_uses=10, log=print, finish_tag
     for turn in range(7):  # a long search can pause (pause_turn) - continue it
         for _ in range(3):
             r = requests.post(API, headers=headers, timeout=900, json={
-                "model": cfg["news"].get("model") or cfg["claude"]["model"], "max_tokens": 16000,
+                "model": cfg["news"].get("model") or cfg["claude"]["model"], "max_tokens": max_tokens,
                 "tools": tools, "messages": messages})
             # some outlets (e.g. Reuters, AP) block Anthropic's crawler: drop them and retry
             blocked = re.search(r"domains are not accessible[^\[]*\[([^\]]*)\]", r.text) if r.status_code == 400 else None
@@ -176,7 +190,7 @@ def claude_web_research(cfg, prompt, domains, max_uses=10, log=print, finish_tag
         log(f"  research pass {turn + 1}: {searches} searches, {len(set(urls))} pages found so far")
         if data.get("stop_reason") == "refusal":
             raise RuntimeError("Claude declined to research this topic.")
-        so_far += data.get("content", [])
+        so_far = _finished_blocks(so_far + data.get("content", []))
         if data.get("stop_reason") == "pause_turn":  # resend everything said so far, it continues
             messages = [messages[0], {"role": "assistant", "content": so_far}]
             continue
@@ -220,7 +234,8 @@ def print_table(research, log=print):
 
 # ---------------------------------------------------------------- research
 
-def research(cfg, topic, log=print):
+def research(cfg, topic, log=print, long=False):
+    """long=True: deeper research (12-20 events incl. background) for Short + long recap."""
     nc = cfg["news"]
     hits = monarchy_hits(topic)
     if hits:  # rule 1, before spending anything. No override.
@@ -230,16 +245,34 @@ def research(cfg, topic, log=print):
     now = datetime.now(BKK)
     prompt = RESEARCH_PROMPT.format(today=now.strftime("%Y-%m-%d"), topic=topic,
                                     outlets=", ".join(sorted(set(credible.values()))), rules=RULES)
-    log(f"Researching: {topic}")
-    text, urls, cited = claude_web_research(cfg, prompt, credible.keys(),
-                                            int(nc.get("max_searches", 10)), log)
-    data = _json_in(text, "research")
+    if long:
+        prompt += LONG_RESEARCH
+    log(f"Researching{' (deep, for the long recap)' if long else ''}: {topic}")
+    text, urls, cited = claude_web_research(
+        cfg, prompt, credible.keys(),
+        int(nc.get("long_searches", 25) if long else nc.get("max_searches", 10)), log,
+        max_tokens=32000 if long else 16000)
+    try:
+        data = _json_in(text, "research")
+    except json.JSONDecodeError as e:  # cut off or a stray quote: repair it, don't redo the searches
+        raw = news_root(cfg) / f"_raw_research_{now:%Y%m%d-%H%M%S}.txt"
+        raw.parent.mkdir(parents=True, exist_ok=True)
+        raw.write_text(text, encoding="utf-8")
+        log(f"  research JSON was broken ({e.msg}) - saved {raw.name}, asking for a repaired copy...")
+        from .script import ask_claude
+        data = _json_in(ask_claude(
+            cfg, "This research JSON is broken (cut off or unescaped quotes). Return the SAME content as "
+                 "valid JSON inside <research></research> tags. Do not add, remove or change any facts or "
+                 "URLs; if the end was cut off, close the open structures and drop the incomplete last "
+                 "item.\n\n" + text[text.find("{"):], max_tokens=32000, timeout=900, effort="low"),
+            "research")
     data["topic"] = data.get("topic") or topic
     data["requested_topic"] = topic
     data = apply_confirmation(data, credible, urls, int(nc.get("min_outlets", 2)))
     data["verified_urls"] = sorted(set(urls))
     data["safety_problems"] = safety_problems(data, cited)
     data["facts_approved"] = False
+    data["want_long"] = bool(long)
     data["researched_at"] = now.isoformat(timespec="seconds")
     base = slugify(re.sub(r"[^A-Za-z0-9 ]+", " ", data.get("topic_en") or ""), 30)
     base = base if base and base != "video" else hashlib.sha1(topic.encode()).hexdigest()[:8]
