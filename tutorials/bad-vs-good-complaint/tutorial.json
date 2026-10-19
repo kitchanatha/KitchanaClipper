@@ -1,0 +1,23 @@
+{
+  "channel": "prompt_minute",
+  "title": "Bad Prompt vs Good Prompt: Angry Customer Reply",
+  "topic": "bad vs good prompt customer complaint reply",
+  "hook_text": "Template or real reply?",
+  "description": "Same AI, same complaint. A vague prompt gives you a template with blanks; a prompt with role, facts, offer and limits gives you a reply you can send. Demo recorded in an incognito Claude chat with a made-up coffee shop.",
+  "hashtags": ["#prompting", "#customerservice", "#claude", "#chatgpt"],
+  "raw": "raw.mp4",
+  "crop": [1064, 1100, 16, 282],
+  "parts": [
+    {"text": "Same AI, same complaint. One prompt gets a template, the other gets a reply you can actually send.",
+     "src": [20, 22]},
+    {"text": "Ask it vaguely: reply to this complaint, my order arrived late and the box was crushed. You get blanks to fill in, and options to pick.",
+     "src": [1, 18], "zoom": [1064, 1000, 0, 0], "label": "BAD PROMPT", "good": false},
+    {"text": "The fix: give it a role, the facts, what to offer, and limits.",
+     "src": [20, 24], "dim": true, "card": ["ROLE", "FACTS", "OFFER", "LIMITS"]},
+    {"text": "A friendly coffee shop agent. Three days late, crushed box. A free replacement or twenty percent off. Under eighty words, and end with a question.",
+     "src": [24, 37], "zoom": [1064, 1000, 0, 0], "label": "GOOD PROMPT", "good": true},
+    {"text": "Now it's ready to send. No guesswork, the right offer, and a question that keeps the customer talking.",
+     "src": [38, 46], "zoom": [1064, 480, 0, 600], "label": "RESULT", "good": true},
+    {"text": "Copy this pattern, and follow Prompt Minute for one AI trick a day.", "src": [46, 56]}
+  ]
+}
