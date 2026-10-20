@@ -22,6 +22,20 @@ from pipeline import channels as chans
 
 cfg = load_config()
 
+if os.name == "nt":
+    # A bot started by another program can inherit an old PATH without tools installed later
+    # (ffmpeg) - load the full Windows PATH so previews and renders always find them.
+    import winreg  # noqa: E402
+    _extra = []
+    for _root, _sub in ((winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment"),
+                        (winreg.HKEY_CURRENT_USER, "Environment")):
+        try:
+            with winreg.OpenKey(_root, _sub) as _k:
+                _extra.append(os.path.expandvars(winreg.QueryValueEx(_k, "Path")[0]))
+        except OSError:
+            pass
+    os.environ["PATH"] = os.pathsep.join([os.environ.get("PATH", "")] + _extra)
+
 # One bot per computer: a second copy would run every daily job and button press twice
 # (duplicate videos and uploads). Holding a local port is released automatically on exit/crash.
 import socket  # noqa: E402
@@ -482,8 +496,11 @@ async def do_pending(inter):
     base = Path(cfg["output_dir"]) / "review"
     items = [p for k in REVIEW_KEYS for p in sorted((base / k).glob("*")) if (p / "video.mp4").exists()]
     await inter.response.send_message(f"{len(items)} waiting for review.")
-    for p in items:
-        await post_card(p)
+    for p in items:  # one broken card must not hide the others
+        try:
+            await post_card(p)
+        except Exception as e:
+            await say(f"⚠️ couldn't post the card for `{p.parent.name}/{p.name}`: `{str(e)[:300]}`")
 
 
 async def do_upload(inter):
