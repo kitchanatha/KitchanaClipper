@@ -420,6 +420,23 @@ comments, subscribers, top 3 / bottom 3 and one suggested change; rows are appen
 `python run.py auth-analytics --channel <key>` once per channel - it saves a separate read-only
 token (`tokens/<key>_analytics.json`), so the upload sign-ins are not touched.
 
+## 12. Without API credit - Claude Code does the writing
+
+Two scheduled tasks in the Claude desktop app (Code tab -> Scheduled) write the scripts on the
+Pro plan instead of the Anthropic API. The Claude app must be open on this PC.
+
+- **Daily Shorts** (about 02:15): one Storytime Cuts + one Wonder Minute video (Wonder uses the
+  saved ideas first). Tap **Pause daily run** in Discord so the bot's own 01:30 API run stops failing.
+- **Discord requests** (hourly, 08:00-23:00): tap **Request (Claude Code)**, type what you want
+  (e.g. "Wonder Minute: the lightning idea"); **Queue** shows progress. News requests are marked
+  "needs session" - ask Claude in the Code tab for those (facts review).
+- Videos made this way get normal review cards (the bot posts them from `data/claude_cards.json`);
+  nothing is uploaded until you tap Approve.
+- **New footage** on a Short's card re-makes it with different clips: same script, voice from the
+  cache (no ElevenLabs credits). The original stays if it fails.
+- Files: `pipeline/claude_queue.py` (queue + `python -m pipeline.claude_queue list|status|card`),
+  `data/claude_queue.json`, `data/claude_scripts/`, `scripts/notify.py`.
+
 ## Files
 
 | Path | What |

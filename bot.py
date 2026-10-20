@@ -19,6 +19,7 @@ from discord import app_commands
 import run as core
 from pipeline.common import load_config, env, ROOT
 from pipeline import channels as chans
+from pipeline import claude_queue as cq
 
 cfg = load_config()
 
@@ -150,7 +151,15 @@ class ReviewView(discord.ui.View):
                                         custom_id=f"fp:a:{key}/{name}"))
         self.add_item(discord.ui.Button(label="Reject", style=discord.ButtonStyle.danger,
                                         custom_id=f"fp:r:{key}/{name}"))
+        if is_short_channel(key):  # same script + cached voice, different clips
+            self.add_item(discord.ui.Button(label="New footage", emoji="🎞️",
+                                            style=discord.ButtonStyle.secondary,
+                                            custom_id=f"fp:n:{key}/{name}"))
         caption_buttons(self, key, name)
+
+
+def is_short_channel(key):
+    return cfg["channels"].get(key, {}).get("type") not in ("story", "news", "tutorial")
 
 
 class CaptionView(discord.ui.View):
@@ -220,13 +229,22 @@ async def post_story_card(folder, meta, key):
     await ch.send(embed=emb, files=files, view=ReviewView(key, folder.name))
 
 
+def fit_bytes(text, limit):
+    """Discord caps a message's embeds by size, and Thai letters take 3 bytes each: cut long
+    scripts (e.g. a long recap) to `limit` UTF-8 bytes."""
+    if len(text.encode("utf-8")) <= limit:
+        return text
+    cut = text.encode("utf-8")[:limit - 30].decode("utf-8", "ignore")
+    return cut.rstrip() + " … (full script in script.txt)"
+
+
 async def post_card(folder):
     folder = Path(folder)
     meta = json.loads((folder / "meta.json").read_text(encoding="utf-8"))
     key = folder.parent.name
     if meta.get("kind") == "story":
         return await post_story_card(folder, meta, key)
-    emb = discord.Embed(title=meta["title"][:250], description=meta["script"][:3900],
+    emb = discord.Embed(title=meta["title"][:250], description=fit_bytes(meta["script"], 3800),
                         color=0x3D1E6D)
     emb.set_author(name=f"{meta['channel_name']}  ·  {MACHINE}")
     emb.set_footer(text=f"{meta['length_sec']}s  ·  {folder.name}")
@@ -277,6 +295,8 @@ async def on_interaction(inter: discord.Interaction):
     if not folder.exists():
         await inter.response.send_message("Already handled.", ephemeral=True)
         return
+    if action == "n":
+        return await do_new_footage(inter, key, folder)
     await inter.response.defer()
     approve = action == "a"
     dest = await asyncio.to_thread(core.decide, cfg, folder, approve)
@@ -292,6 +312,33 @@ async def on_interaction(inter: discord.Interaction):
         except BaseException as e:  # SystemExit from missing auth too
             note += f"\nUpload failed: {e}\nFix it, then tap Upload approved."
     await msg.edit(view=keep, content=note[:1990])
+
+
+REMAKING = set()
+
+
+async def do_new_footage(inter, key, folder):
+    if not is_short_channel(key) or folder in REMAKING:
+        return await inter.response.send_message(
+            "Already re-making this one." if folder in REMAKING else "Not available for this video type.",
+            ephemeral=True)
+    REMAKING.add(folder)
+    await inter.response.defer()
+    msg = inter.message
+    await msg.edit(content=f"🎞️ {inter.user.display_name} asked for new footage - re-making "
+                           "(same voice, no credits)...", view=None)
+    try:
+        await asyncio.to_thread(core.new_footage, cfg, key, folder)
+        await msg.edit(content="🎞️ Replaced with new footage - new card below.", embed=None,
+                       attachments=[], view=None)
+        await post_card(folder)
+    except BaseException as e:
+        await msg.edit(content=f"New footage failed: `{str(e)[:300]}` - the original is unchanged.",
+                       view=ReviewView(key, folder.name))
+        with open(ROOT / "data" / "errors.log", "a", encoding="utf-8") as f:
+            f.write(f"\n--- {datetime.now()} new footage {key}\n{traceback.format_exc()}")
+    finally:
+        REMAKING.discard(folder)
 
 
 def upload_warnings(key, name):
@@ -379,6 +426,11 @@ async def daily_loop():
             state["last_topics"] = today
             save_state(state)
             await run_topics("daily topic finder", wait=True)
+        for f in cq.take_cards():  # videos made by Claude Code (daily task / Request queue)
+            try:
+                await post_card(Path(f))
+            except Exception as e:
+                await say(f"⚠️ couldn't post the card for `{f}`: `{str(e)[:300]}`")
         await asyncio.sleep(30)
 
 
@@ -551,7 +603,9 @@ def panel_view():
         ("Set daily time", "cp:settime", discord.ButtonStyle.secondary, 1),
     ] + ([("Stories", "cp:stories", discord.ButtonStyle.primary, 1)] if STORY_MODE else []) \
       + ([("News", "cp:news", discord.ButtonStyle.primary, 1)] if NEWS_MODE else []) \
-      + ([("Popular ideas", "cp:ideas", discord.ButtonStyle.primary, 2)] if IDEA_KEYS else []):
+      + ([("Popular ideas", "cp:ideas", discord.ButtonStyle.primary, 2)] if IDEA_KEYS else []) \
+      + [("Request (Claude Code)", "cp:req", discord.ButtonStyle.primary, 2),
+         ("Queue", "cp:queue", discord.ButtonStyle.secondary, 2)]:
         v.add_item(discord.ui.Button(label=label, custom_id=cid, style=style, row=row))
     return v
 
@@ -565,6 +619,19 @@ def channel_picker_view():
         v.add_item(discord.ui.Button(label="All my channels", custom_id="cp:gen:all",
                                      style=discord.ButtonStyle.secondary))
     return v
+
+
+class RequestModal(discord.ui.Modal, title="Request for Claude Code"):
+    text = discord.ui.TextInput(
+        label="What should Claude Code make?", style=discord.TextStyle.paragraph, max_length=500,
+        placeholder="e.g. Wonder Minute: lightning idea / Storytime: a wrong-delivery story")
+
+    async def on_submit(self, inter: discord.Interaction):
+        item = cq.add(self.text.value, inter.user.display_name)
+        await inter.response.send_message(
+            f"⏳ Queued #{item['id']}: {item['text'][:300]}\nClaude Code checks the queue every hour "
+            "(08:00-23:00, the Claude app must be open on this PC); the video comes back here as a "
+            "review card. Tap **Queue** to see progress.")
 
 
 class TimeModal(discord.ui.Modal, title="Daily run time"):
@@ -629,6 +696,10 @@ async def handle_panel(inter, cid):
         if key not in IDEA_KEYS:
             return await inter.response.send_message("Unknown channel.", ephemeral=True)
         await do_ideas(inter, key)
+    elif cid == "cp:req":
+        await inter.response.send_modal(RequestModal())
+    elif cid == "cp:queue":
+        await inter.response.send_message(cq.queue_text()[:1990])
     elif cid == "cp:news":
         if not NEWS_MODE:
             return await inter.response.send_message("News mode is off on this computer.", ephemeral=True)

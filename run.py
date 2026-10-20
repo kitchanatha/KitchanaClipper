@@ -137,6 +137,21 @@ def generate_one(cfg, key, script_file=None, script=None, folder=None, extra_met
         shutil.rmtree(work, ignore_errors=True)
 
 
+def new_footage(cfg, key, folder):
+    """Re-make a reviewed Short with different clips: same script, voice from the cache (no
+    credits), clips already used are skipped. Built next to the old one first, so a failure
+    keeps the original."""
+    folder = Path(folder)
+    meta = json.loads((folder / "meta.json").read_text(encoding="utf-8"))
+    script = {k: v for k, v in meta.items()
+              if k not in ("channel", "channel_name", "length_sec", "created", "pexels_ids")}
+    tmp = folder.with_name(folder.name + "-nf")
+    generate_one(cfg, key, script=script, folder=tmp)
+    shutil.rmtree(folder)
+    tmp.rename(folder)
+    return folder
+
+
 def cached_voice(cfg, ch, text, out_mp3, cache_dir=None):
     """make_voice, optionally cached on disk (mp3 + word timings) so the same text is never
     paid for twice."""
