@@ -1,0 +1,23 @@
+{
+  "channel": "prompt_minute",
+  "title": "Make AI Explain Anything Like You're 10",
+  "topic": "explain like I'm 10 prompt simple explanations",
+  "hook_text": "AI answers too complicated?",
+  "description": "Add 'like I'm 10', one everyday example and a length limit, and any AI explains things in plain words. Demo recorded in an incognito Claude chat.",
+  "hashtags": ["#prompting", "#learnwithai", "#claude", "#chatgpt"],
+  "raw": "raw.mp4",
+  "crop": [1064, 1100, 16, 282],
+  "parts": [
+    {"text": "AI answers too complicated? Add a few words to any question.", "src": [26, 28]},
+    {"text": "Ask: explain inflation. You get a wall of textbook words, and you're still confused.",
+     "src": [1, 24], "zoom": [1064, 1000, 0, 0], "label": "BAD PROMPT", "good": false},
+    {"text": "The fix: like I'm ten, one everyday example, and keep it short.",
+     "src": [28, 32], "dim": true, "card": ["LIKE I'M 10", "ONE EXAMPLE", "SHORT"]},
+    {"text": "Explain inflation like I'm ten. Use ice cream prices, four sentences max, no jargon.",
+     "src": [32, 40], "zoom": [1064, 1000, 0, 0], "label": "GOOD PROMPT", "good": true},
+    {"text": "Now it clicks in ten seconds: same ice cream, higher price, fewer cones for your money.",
+     "src": [40, 50], "zoom": [1064, 420, 0, 360], "label": "RESULT", "good": true},
+    {"text": "Try it on taxes, crypto, or your doctor's notes. Follow Prompt Minute for one AI trick a day.",
+     "src": [50, 60]}
+  ]
+}
