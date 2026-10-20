@@ -186,6 +186,10 @@ channels:
     hook_options: true      # 3 opening lines (5-10 words), Claude scores them, the best is spoken first
     hook_card: sentence     # the spoken hook itself shown big for the first ~2 s
     footage_hint: night city, rain on window, phone screen, empty street, apartment, mysterious hallway
+    # everyday-realistic only: no fantasy scenes, religious scenes or artworks
+    footage_exclude: [fantasy, fairy, mushroom, magic, ai generated, cartoon, animation, religion,
+                      religious, prayer, quran, bible, mosque, church, painting, artwork, art, museum,
+                      flag, flags]
     hashtags: ["#storytime", "#story", "#shorts"]
     description_footer: "This is a fictional story. Follow Storytime Cuts for more."
     style: |
