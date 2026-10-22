@@ -37,8 +37,8 @@ news:                       # Thai news recaps (สรุปให้ฟัง) 
   min_outlets: 2            # a fact needs this many DIFFERENT credible outlets (the rule says 2)
   min_beats: 4
   max_beats: 7
-  script_seconds: [60, 90]
-  short_seconds: [60, 85]   # news-build --short: a shorter version next to the full one
+  script_seconds: [45, 55]  # viewers leave at ~20-30 s (Oct analytics): key number in the first line
+  short_seconds: [35, 45]   # news-build --short: an even shorter version next to the main one
   max_searches: 10          # web searches per research run
   closing_line: "ติดตามสรุปให้ฟัง เพื่อไม่พลาดเรื่องที่คนพูดถึง"
   disclaimer: "สรุปจากรายงานของสื่อที่ระบุด้านบน ข้อกล่าวหาเป็นเพียงข้อกล่าวหาจนกว่าจะมีคำตัดสิน · เสียงบรรยายโดย AI"
@@ -90,6 +90,11 @@ social:                     # Facebook + Instagram captions for every video (Dis
     candlelit_en: ""
     summed_up: "@สรุปให้ฟังOfficial"
     wonder_minute: ""
+
+claude_code:                # no Anthropic API credit: Claude Code (scheduled tasks in the Claude app on
+  enabled: true             # this PC, Pro plan) writes scripts + does news research instead. The bot's
+                            # own 01:30 run and 07:30 topic finder are skipped; Make video / News /
+                            # topic picks / script writing go to the Claude Code queue. README section 12.
 
 crosspost:                  # after a video is approved AND uploaded to YouTube
   pack: true                # output/crosspost/<channel>/<date>_<slug>/: video.mp4 + caption_<lang>.txt
@@ -185,22 +190,29 @@ channels:
     script_seconds: [35, 45]  # short and tight - viewers were swiping away in the first seconds
     hook_options: true      # 3 opening lines (5-10 words), Claude scores them, the best is spoken first
     hook_card: sentence     # the spoken hook itself shown big for the first ~2 s
-    footage_hint: night city, rain on window, phone screen, empty street, apartment, mysterious hallway
-    # everyday-realistic only: no fantasy scenes, religious scenes or artworks
+    footage_hint: dark hallway, apartment at night, flickering light, rain on window, empty street night, door ajar
+    # everyday-realistic only: no fantasy, religious scenes, artworks, and no gore / horror-movie props
     footage_exclude: [fantasy, fairy, mushroom, magic, ai generated, cartoon, animation, religion,
                       religious, prayer, quran, bible, mosque, church, painting, artwork, art, museum,
-                      flag, flags]
-    hashtags: ["#storytime", "#story", "#shorts"]
-    description_footer: "This is a fictional story. Follow Storytime Cuts for more."
+                      flag, flags, blood, gore, zombie, skull, skeleton, mask, clown, halloween,
+                      costume, demon, monster, weapon, knife, gun, corpse]
+    hashtags: ["#scarystories", "#creepy", "#storytime", "#shorts"]
+    description_footer: "This is a fictional story. Follow Storytime Cuts for the next part."
+    series: 3                 # every story is a 3-part series (+ a Full Story a week later)
     style: |
-      An ORIGINAL short fictional story told in first person, with a surprising
-      twist. The FIRST sentence is the hook: 5-10 words, spoken in under 2 seconds,
-      creating an open question (e.g. "My neighbor left me a key and a warning.").
-      NO scene-setting before the hook - no "So", no "Last year", no names or places
-      first. Then keep tension rising and END ON THE REVEAL in the final lines.
-      About real-feeling everyday situations (neighbors, wrong texts, strange
-      coincidences). No violence or gore. Never say "Follow for part 2" (no part 2s
-      are planned); end with "Follow for more stories."
+      ONE PART of an ORIGINAL 3-part fictional horror-mystery series, told in first person,
+      in a real-feeling everyday setting (apartment, night shift, elevator, voicemail,
+      smart speaker, parcel locker, babysitting monitor...). Something strange KEEPS
+      HAPPENING ("every night...", "every morning...").
+      The FIRST sentence is the hook: 5-10 words, spoken in under 2 seconds, an unsettling
+      open question (e.g. "My smart speaker answers questions I never ask."). NO
+      scene-setting before it. Around 20 seconds in, a NEW chilling clue (people leave at
+      ~25 s - give them a reason to stay). Parts 1 and 2 end on a cliffhanger + "Follow for
+      part 2." / "Follow for the final part."; the final part ends on a TERRIFYING TWIST
+      that recontextualises everything (the narrator was wrong about who / what / when) +
+      "Follow for more stories." Creepy through implication and dread, NOT gore: no blood,
+      no graphic violence, no self-harm, no harm to children or animals, no real people or
+      places.
 
   wonder_minute:
     name: Wonder Minute
@@ -229,14 +241,18 @@ channels:
                       horror, effect, blender, architecture, bridge, city]
     hashtags: ["#facts", "#amazing", "#didyouknow", "#shorts"]
     description_footer: "Follow Wonder Minute for one amazing fact a day."
+    script_seconds: [35, 45]  # Venus (69 s watched of 60 = loops) vs Sharks (52 s, half left): keep it tight
     style: |
       ONE amazing, true fact about nature, animals, space, the ocean, the human body,
       earth, history or engineering - the kind that makes people say "wait, what?".
-      Open with the most surprising part in under 10 words. Then explain how / why it
-      happens in plain words, with one vivid comparison people can picture. Only
-      well-documented facts you are certain of: no made-up numbers, no myths, no
+      Best performers are CONTRADICTIONS ("a day longer than a year", "a banana is a
+      berry"). Open with the contradiction in under 10 words. Then explain how / why in
+      plain words with one vivid comparison, and SAVE the single most surprising detail
+      for the final line before the outro (a reason to watch to the end - and to loop).
+      Only well-documented facts you are certain of: no made-up numbers, no myths, no
       "scientists say" without substance, no exaggeration. End with:
-      "Follow for one amazing fact a day."
+      "Follow for one amazing fact a day." (or, when tomorrow's fact is known:
+      "Tomorrow: <6-word teaser>. Follow so you don't miss it.")
       Footage keywords: start EVERY keyword with the main subject as one plain noun, then what
       it does (e.g. "octopus swimming", "octopus close up", "octopus camouflage") - 4 of the 5
       keywords about the subject itself.

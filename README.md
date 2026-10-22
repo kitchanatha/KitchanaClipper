@@ -436,6 +436,25 @@ Pro plan instead of the Anthropic API. The Claude app must be open on this PC.
   cache (no ElevenLabs credits). The original stays if it fails.
 - Files: `pipeline/claude_queue.py` (queue + `python -m pipeline.claude_queue list|status|card`),
   `data/claude_queue.json`, `data/claude_scripts/`, `scripts/notify.py`.
+- `claude_code.enabled: true` in config.yaml switches the bot over: its own 01:30 run and 07:30 topic
+  finder are skipped, and **Make video**, **News**, topic picks and "facts approved" (script writing)
+  are queued for Claude Code instead of calling the API.
+- **สรุปให้ฟัง without the API** (`pipeline/claude_news.py`): the **topic finder** task (07:30) and the
+  queue task get the SAME prompts from the code and pass their work through the SAME checks
+  (credible outlets only, 2+ outlets per fact, monarchy / private people / minors refusals, script
+  rules and length) before anything is saved. Flow: topic cards -> you pick -> research (queue) ->
+  facts card -> you approve -> script (queue) -> the bot builds -> video card -> you approve.
+- The queue task runs every 30 min (08:00-23:00).
+
+### Channel plans (Oct analytics)
+- **Wonder Minute**: 2 a day, 35-45 s, "contradiction" facts first, the most surprising detail saved
+  for the last line, "Tomorrow: ..." teaser outro, "Amazing fact #N" in the description.
+- **สรุปให้ฟัง**: Shorts 45-55 s (people left at 20-30 s), key number first; long recaps only for big
+  stories; new long thumbnail = 2 lines of huge text + the key number in a big yellow box over a
+  blurred frame of the video.
+- **Storytime Cuts**: 3-part horror-mystery series (a new chilling clue at ~20 s, a terrifying twist in
+  the final part, no gore), one part a night, Full Story built with Part 3 - approve it a week later.
+  The series state is `data/storytime_series.json`.
 
 ## Files
 

@@ -74,6 +74,9 @@ REVIEW_KEYS = list(dict.fromkeys(MY_CHANNELS + STORY_KEYS + NEWS_KEYS + IDEA_KEY
 
 STATE = ROOT / "data" / f"bot_state_{MACHINE}.json"
 AUTO = cfg.get("automation", {})
+# claude_code.enabled: no Anthropic API credit - script writing / research go to the Claude Code queue
+# (scheduled tasks in the Claude app on this PC) instead of the API. README section 12.
+CLAUDE_MODE = bool((cfg.get("claude_code") or {}).get("enabled"))
 MAX_PREVIEW = 9 * 1024 * 1024
 
 
@@ -410,7 +413,7 @@ async def daily_loop():
     while not bot.is_closed():
         now = datetime.now()
         today = now.strftime("%Y-%m-%d")
-        if (not state["paused"] and state["last_daily"] != today
+        if (not CLAUDE_MODE and not state["paused"] and state["last_daily"] != today
                 and now.strftime("%H:%M") >= state["daily_time"]):
             state["last_daily"] = today
             save_state(state)
@@ -421,17 +424,34 @@ async def daily_loop():
             state["last_report"] = today
             save_state(state)
             await run_report("weekly report")
-        if (NEWS_MODE and not state["paused"] and state.get("last_topics") != today
+        if (NEWS_MODE and not CLAUDE_MODE and not state["paused"] and state.get("last_topics") != today
                 and now.strftime("%H:%M") >= topics_time()):
             state["last_topics"] = today
             save_state(state)
             await run_topics("daily topic finder", wait=True)
-        for f in cq.take_cards():  # videos made by Claude Code (daily task / Request queue)
+        for f in cq.take_cards():  # handed over by Claude Code (daily tasks / Request queue)
             try:
-                await post_card(Path(f))
+                await claude_card(f)
             except Exception as e:
                 await say(f"⚠️ couldn't post the card for `{f}`: `{str(e)[:300]}`")
         await asyncio.sleep(30)
+
+
+async def claude_card(item):
+    """video folder | topics:<day> | facts:<slug> | build:<slug> (scripts ready -> build it)."""
+    kind, _, rest = item.partition(":") if item.split(":", 1)[0] in ("topics", "facts", "build") else ("", "", item)
+    if kind == "topics":
+        from pipeline.topics import TOPICS_DIR
+        data = json.loads((TOPICS_DIR / f"{rest}.json").read_text(encoding="utf-8"))
+        await post_topics(data, rest)
+    elif kind == "facts":
+        from pipeline import news
+        await post_fact_card(rest, news.read_json(news.news_dir(cfg, rest) / "research.json"))
+        await post_panel()
+    elif kind == "build":
+        bot.loop.create_task(run_news_build(rest, "Claude Code"))
+    else:
+        await post_card(Path(item))
 
 
 def counts():
@@ -483,6 +503,10 @@ def status_text():
 
 async def do_generate(inter, keys, count=1):
     count = max(1, min(count, 5))
+    if CLAUDE_MODE:
+        names = ", ".join(cfg["channels"][k]["name"] for k in keys)
+        item = cq.add(f"Make {count} video(s) for: {names}", inter.user.display_name)
+        return await inter.response.send_message(f"⏳ Queued #{item['id']} for Claude Code: {count} for {names}.")
     if job_lock.locked():
         return await inter.response.send_message("A job is already running - wait for it to finish.",
                                                  ephemeral=True)
@@ -952,6 +976,10 @@ class NewsTopicModal(discord.ui.Modal, title="New สรุปให้ฟัง
                                  placeholder="e.g. ข้อถกเถียงร่างแก้ไขกฎหมายไทยพีบีเอส")
 
     async def on_submit(self, inter: discord.Interaction):
+        if CLAUDE_MODE:
+            item = cq.add(f"NEWS-RESEARCH {self.topic.value}", inter.user.display_name)
+            return await inter.response.send_message(
+                f"⏳ Queued #{item['id']} for Claude Code: research `{self.topic.value[:100]}`.")
         await inter.response.send_message(f"Researching: {self.topic.value}", ephemeral=True)
         bot.loop.create_task(run_news_research(self.topic.value, inter.user.display_name))
 
@@ -1061,12 +1089,15 @@ async def run_topics(reason, wait=False):
             with open(ROOT / "data" / "errors.log", "a", encoding="utf-8") as f:
                 f.write(f"\n--- {datetime.now()} topics\n{traceback.format_exc()}")
             return
-    day = datetime.fromisoformat(data["created"]).strftime("%Y%m%d")
+    await post_topics(data, datetime.fromisoformat(data["created"]).strftime("%Y%m%d"))
+
+
+async def post_topics(data, day):
     ch = await control()
     dropped = "; ".join(f"{d['title'][:40]} ({d['reason']})" for d in data["dropped"][:6])
     await ch.send(f"**สรุปให้ฟัง - today's topics** ({len(data['topics'])} passed the safety filter). "
                   f"Make Short / Make Short + Long starts the usual research -> your fact approval -> "
-                  f"video -> your video approval." + (f"\nLeft out: {dropped}"[:1500] if dropped else ""))
+                  f"video -> your video approval. Long recaps only for big stories." + (f"\nLeft out: {dropped}"[:1500] if dropped else ""))
     for i, t in enumerate(data["topics"], 1):
         await ch.send(embed=topic_embed(t, i), view=topic_view(day, i))
     await post_panel()
@@ -1095,11 +1126,22 @@ async def handle_topic(inter, cid):
         return
     mark_covered(t)  # not offered again for 14 days
     query = f"{t.get('title_th')} ({t.get('topic_en')})"
+    if CLAUDE_MODE:
+        item = cq.add(f"NEWS-RESEARCH{' --long' if what == 'sl' else ''} {query}", who)
+        return await say(f"⏳ Queued #{item['id']} for Claude Code: research `{query[:100]}` - the facts card "
+                         "comes here when it's done.")
     bot.loop.create_task(run_news_research(query, who, want_long=(what == "sl"), wait=True))
 
 
 async def run_news_build(slug, user):
     from pipeline import news
+    if CLAUDE_MODE:
+        d = news.news_dir(cfg, slug)
+        want_long = news.read_json(d / "research.json").get("want_long")
+        if not (d / "script.json").exists() or (want_long and not (d / "script_long.json").exists()):
+            item = cq.add(f"NEWS-SCRIPT{' --long' if want_long else ''} {slug}", user)
+            return await say(f"⏳ Queued #{item['id']} for Claude Code: write + check the script for `{slug}`; "
+                             "it builds automatically after that.")
     async with job_lock:  # waits if another job runs
         await say(f"**{MACHINE}**: facts approved by {user} - writing the script (+ safety review), "
                   f"recording the voice and building `{slug}`...")

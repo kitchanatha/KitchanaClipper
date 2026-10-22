@@ -266,6 +266,34 @@ def research(cfg, topic, log=print, long=False):
                  "URLs; if the end was cut off, close the open structures and drop the incomplete last "
                  "item.\n\n" + text[text.find("{"):], max_tokens=32000, timeout=900, effort="low"),
             "research")
+    return finish_research(cfg, topic, data, urls, cited, long, log)
+
+
+def research_prompt(cfg, topic, long=False):
+    """The research instructions, for Claude Code doing the research without the API."""
+    nc = cfg["news"]
+    prompt = RESEARCH_PROMPT.format(today=datetime.now(BKK).strftime("%Y-%m-%d"), topic=topic,
+                                    outlets=", ".join(sorted(set(nc["credible_outlets"].values()))),
+                                    rules=RULES)
+    return prompt + (LONG_RESEARCH if long else "")
+
+
+def import_research(cfg, topic, path, long=False, log=print):
+    """Research Claude Code did (no API): JSON {"research": {...same shape as RESEARCH_PROMPT asks},
+    "urls": [every URL it actually opened]}. Same checks as research(): only those URLs on credible
+    outlets count, facts need 2+ outlets, the monarchy / private-person / minors rules apply."""
+    hits = monarchy_hits(topic)
+    if hits:
+        raise SystemExit(f"Refused: this topic touches the monarchy / royal family ({', '.join(hits)}).")
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    urls = [u for u in raw.get("urls", []) if isinstance(u, str)]
+    return finish_research(cfg, topic, raw["research"], urls, urls, long, log)
+
+
+def finish_research(cfg, topic, data, urls, cited, long, log=print):
+    nc = cfg["news"]
+    credible = nc["credible_outlets"]
+    now = datetime.now(BKK)
     data["topic"] = data.get("topic") or topic
     data["requested_topic"] = topic
     data = apply_confirmation(data, credible, urls, int(nc.get("min_outlets", 2)))

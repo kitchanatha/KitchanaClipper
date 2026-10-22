@@ -259,30 +259,66 @@ def write_long_ass(path, ch, title, sections, cues, total, end_t, today_label):
 
 # ---------------------------------------------------------------- thumbnail
 
-def thumbnail(cfg, ch, headline, date_label, workdir, out_jpg):
-    """1280x720: channel navy, timeline motif, date pill, big Thai headline. No photos."""
+UNITS = ("ล้านล้าน", "แสนล้าน", "หมื่นล้าน", "พันล้าน", "ล้าน", "บาท", "คน", "ราย", "จังหวัด",
+         "วัน", "ปี", "ครั้ง", "ลิตร", "เท่า")
+
+
+def split_number(headline):
+    """'ดีเซล 30 สู่ 42.94' -> ('ดีเซล 30 สู่', '42.94'); 'เสียหาย 2 พันล้าน' -> ('เสียหาย', '2 พันล้าน'):
+    the LAST number (with its unit) goes big on the thumbnail."""
+    import re
+    m = list(re.finditer(r"\d[\d,.]*%?", headline))
+    if not m:
+        return headline.strip(), ""
+    n = m[-1]
+    end = n.end()
+    rest = headline[end:].lstrip()
+    unit = next((u for u in UNITS if rest.startswith(u)), "")
+    if unit:
+        end = headline.index(unit, end) + len(unit)
+    number = headline[n.start():end].strip().rstrip(".,")
+    return " ".join((headline[:n.start()] + " " + headline[end:]).split()), number
+
+
+def _width_chars(text):
+    """Visible character count (Thai vowel / tone marks above or below don't take width)."""
+    import unicodedata
+    return sum(1 for c in text if unicodedata.category(c) != "Mn")
+
+
+def thumbnail(cfg, ch, headline, date_label, workdir, out_jpg, video=None):
+    """1280x720, readable on a phone: a darkened frame of the video (when given) behind 2 lines of
+    huge Thai text and the key number in a giant yellow box. No photos of people (news footage
+    is already people-free)."""
     workdir = Path(workdir)
     tw, th = 1280, 720
     accent, red = ass_color(ch["highlight_color"]), ass_color(ch.get("latest_color", "#E63946"))
     white, navy = ass_color(ch["caption_color"]), ass_color(ch["bg_color"])
     head = ch.get("title_font", "Kanit ExtraBold")
-    lines = wrap_text(headline, "th", 11)[:3]
-    size = 132 if len(lines) <= 2 else 112
-    ev = []
-    # timeline motif: spine + dots on the right
-    ev.append(_draw(1, 0, 5, f"m 1080 90 l 1090 90 l 1090 630 l 1080 630", accent, r"\alpha&H50&"))
-    for i, col in enumerate((accent, accent, accent, red)):
-        ev.append(_draw(2, 0, 5, circle(1085, 130 + 150 * i, 30 if col == red else 22), col))
-    ev += logo(0, 5, 70, 60, 0.9, accent, red, white)
-    ev.append(_text(3, 0, 5, "Small", 200, 52, ch["name"]))
-    ev += _pill(3, 0, 5, 70, 170, date_label, accent, navy)
-    for i, line in enumerate(lines):
-        col = accent if i == 0 else white
-        ev.append(_text(4, 0, 5, "Head", 70, 280 + int(size * 1.05) * i, line, rf"\1c{col}"))
+    text, number = split_number(headline)
+    lines = wrap_text(text, "th", 12)[:2] if text else []
+    size = 150 if len(lines) <= 1 else 128
+    ev = [_draw(0, 0, 5, "m 0 0 l 820 0 l 820 720 l 0 720", navy, r"\alpha&H40&")]  # dark text panel
+    ev += logo(0, 5, 60, 50, 0.8, accent, red, white)
+    ev.append(_text(3, 0, 5, "Small", 175, 40, ch["name"]))
+    ev += _pill(3, 0, 5, 1010, 50, date_label, accent, navy)
+    y = 140
+    for line in lines:
+        ev.append(_text(4, 0, 5, "Head", 60, y, line, rf"\1c{white}"))
+        y += int(size * 1.02)
+    if number:
+        w = _width_chars(number)
+        nsize = 220 if w <= 5 else 170 if w <= 8 else 130
+        bw = min(1180, int(w * nsize * 0.42) + 90)
+        top = min(y + 10, 690 - int(nsize * 1.1))
+        ev.append(_draw(2, 0, 5, rrect(50, top, bw, int(nsize * 1.1), 26), accent))
+        ev.append(_text(4, 0, 5, "Num", 92, top - int(nsize * 0.04), number, rf"\1c{navy}\fs{nsize}"))
+    ev.append(_draw(2, 0, 5, f"m 0 700 l {tw} 700 l {tw} 720 l 0 720", red))  # red base bar
     styles = [
-        f"Style: Head,{head},{size},{white},{white},&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,5,4,7,0,0,0,1",
-        f"Style: Small,{head},40,{white},{white},&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1",
-        f"Style: Pill,{head},36,{navy},{navy},&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,5,0,0,0,1",
+        f"Style: Head,{head},{size},{white},{white},&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,6,5,7,0,0,0,1",
+        f"Style: Num,{head},230,{navy},{navy},&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1",
+        f"Style: Small,{head},44,{white},{white},&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,3,0,7,0,0,0,1",
+        f"Style: Pill,{head},40,{navy},{navy},&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,5,0,0,0,1",
         f"Style: Draw,{head},20,{white},{white},&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1"]
     lines_ass = ["[Script Info]", "ScriptType: v4.00+", f"PlayResX: {tw}", f"PlayResY: {th}",
                  "WrapStyle: 2", "ScaledBorderAndShadow: yes", "", "[V4+ Styles]",
@@ -293,10 +329,17 @@ def thumbnail(cfg, ch, headline, date_label, workdir, out_jpg):
                  "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"]
     lines_ass += [f"Dialogue: {L},{ass_time(a)},{ass_time(b)},{s},,0,0,0,,{t}" for L, a, b, s, t in ev]
     (workdir / "thumb.ass").write_text("\n".join(lines_ass) + "\n", encoding="utf-8-sig")
-    bg = ch["bg_color"].lstrip("#")
-    run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", f"color=c=0x{bg}:s={tw}x{th}:d=1",
-         "-vf", f"vignette=angle=PI/4,subtitles=thumb.ass:fontsdir='{_filter_path(cfg['fonts_dir'])}'",
-         "-frames:v", "1", "-q:v", "2", str(Path(out_jpg).resolve())], cwd=workdir)
+    subs = f"subtitles=thumb.ass:fontsdir='{_filter_path(cfg['fonts_dir'])}'"
+    if video and Path(video).exists():
+        src = ["-ss", f"{max(1.0, duration(video) * 0.3):.1f}", "-i", str(Path(video).resolve())]
+        vf = f"scale={tw}:{th}:force_original_aspect_ratio=increase,crop={tw}:{th},boxblur=18:2," \
+             f"eq=brightness=-0.3:saturation=1.1,{subs}"
+    else:
+        bg = ch["bg_color"].lstrip("#")
+        src = ["-f", "lavfi", "-i", f"color=c=0x{bg}:s={tw}x{th}:d=1"]
+        vf = f"vignette=angle=PI/4,{subs}"
+    run(["ffmpeg", "-y", "-v", "error", *src, "-vf", vf, "-frames:v", "1", "-q:v", "2",
+         str(Path(out_jpg).resolve())], cwd=workdir)
 
 
 # ---------------------------------------------------------------- build
@@ -404,7 +447,7 @@ def build_long(cfg, slug, force_script=False, log=print):
         last = max((events[x].get("date") or "" for b in script["beats"] for x in b["event_ids"] if x in events),
                    default="")
         thumbnail(cfg, ch, script["thumb_headline"], thai_date(last) if last else today, work,
-                  out_dir / "thumbnail.jpg")
+                  out_dir / "thumbnail.jpg", video=out_dir / "video.mp4")
     except BaseException:
         shutil.rmtree(out_dir, ignore_errors=True)
         raise
