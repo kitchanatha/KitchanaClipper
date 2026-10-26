@@ -39,8 +39,22 @@ def handle_for(cfg, key):
     return ((cfg.get("social") or {}).get("handles") or {}).get(key, "").strip()
 
 
+def plain_social(cfg, key, meta):
+    """Captions without Claude: title + the first lines of the description + hashtags, plus the
+    AI-narration note. News keeps the whole description, so the sources are always included."""
+    ch = cfg["channels"][key]
+    lines = [line for line in meta.get("description", "").split("\n") if line.strip()]
+    desc = "\n".join(lines if ch.get("type") == "news" else lines[:6])
+    tags = " ".join(meta.get("hashtags") or ch.get("hashtags") or [])
+    ai = "เสียงบรรยายโดย AI" if ch.get("language") == "th" else "AI-narrated"
+    text = "\n\n".join(x for x in [meta.get("title", ""), desc, ai, tags] if x)
+    return {"facebook": text, "instagram": text}
+
+
 def write_social(cfg, key, meta, ask=None):
     """Returns {"facebook": ..., "instagram": ...}."""
+    if ask is None and (cfg.get("claude_code") or {}).get("enabled"):
+        return plain_social(cfg, key, meta)  # no API credit: simple captions from the video's own text
     if ask is None:
         from .script import ask_claude as ask
     ch = cfg["channels"][key]

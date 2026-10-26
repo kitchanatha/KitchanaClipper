@@ -1143,8 +1143,12 @@ async def run_news_build(slug, user):
             return await say(f"⏳ Queued #{item['id']} for Claude Code: write + check the script for `{slug}`; "
                              "it builds automatically after that.")
     async with job_lock:  # waits if another job runs
-        await say(f"**{MACHINE}**: facts approved by {user} - writing the script (+ safety review), "
-                  f"recording the voice and building `{slug}`...")
+        if user == "Claude Code":  # script written + checked in the queue after your fact approval
+            await say(f"**{MACHINE}**: script ready (written + checked by Claude Code) - recording the voice "
+                      f"and building `{slug}`...")
+        else:
+            await say(f"**{MACHINE}**: facts approved by {user} - writing the script (+ safety review), "
+                      f"recording the voice and building `{slug}`...")
         prog = Progress(bot.loop)
         try:
             out = await asyncio.to_thread(news.build, cfg, slug, False, prog.log)
