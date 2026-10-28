@@ -99,6 +99,26 @@ class PostPlatformsTest(unittest.TestCase):
         up.assert_not_called()
         self.assertTrue(r["ok"] and "tiktokstudio/upload" in r["note"] and r["caption"].endswith("AI voice"))
 
+    def test_instagram_upload_retried_with_fresh_container(self):
+        from pipeline import facebook as fb
+        video = self.folder / "video.mp4"
+        video.write_bytes(b"x" * 10)
+        failed = fb.MetaError("instagram upload", 400, {"debug_info": {"retriable": False,
+                                                                       "type": "ProcessingFailedError"}})
+        steps = iter([{"id": "c1", "uri": "u1"}, failed, {"id": "c2", "uri": "u2"}, {"success": True},
+                      {"status_code": "FINISHED"}, {"id": "m1"}, {"permalink": "https://instagram.com/reel/x"}])
+
+        def fake_call(*a, **kw):
+            nxt = next(steps)
+            if isinstance(nxt, Exception):
+                raise nxt
+            return nxt
+        with mock.patch.object(fb, "token_status", return_value={"ok": True}), \
+                mock.patch.object(fb, "call", side_effect=fake_call), \
+                mock.patch.object(xp, "meta_creds", return_value={"ig_id": "1", "ig_id_token": "1", "token": "t"}):
+            url = xp.post_instagram_reel(self.cfg, "wonder_minute", video, "cap", sleep=lambda s: None)
+        self.assertEqual(url, "https://instagram.com/reel/x")
+
     def test_switched_off_platform_is_never_called(self):
         self.cfg["channels"]["wonder_minute"]["crosspost"]["tiktok"]["enabled"] = False
         fb = mock.Mock(return_value={"platform": "facebook", "ok": True, "url": "u"})

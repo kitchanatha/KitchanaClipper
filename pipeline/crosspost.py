@@ -117,18 +117,28 @@ def post_instagram_reel(cfg, key, video, caption, wait_s=300, sleep=time.sleep):
     if c["ig_id_token"] and c["ig_id"] != c["ig_id_token"]:  # never post to another channel's account
         raise RuntimeError(f"config ig_id {c['ig_id']} is not the account linked to this Page "
                            f"({c['ig_id_token']}) - not posting")
+    from .facebook import MAX_TRIES, MetaError
     ver = graph_version(cfg)
     g = f"https://graph.facebook.com/{ver}"
-    cont = call("POST", f"{g}/{c['ig_id']}/media", "instagram container", data={
-        # no share_to_feed: with upload_type=resumable it makes the upload fail (ProcessingFailedError,
-        # tested Oct 2026); Reels show in the feed by default anyway
-        "media_type": "REELS", "upload_type": "resumable", "caption": caption,
-        "is_ai_generated": "true", "access_token": c["token"]}, sleep=sleep)
-    cid = cont["id"]
     data = Path(video).read_bytes()
-    call("POST", cont.get("uri") or f"https://rupload.facebook.com/ig-api-upload/{ver}/{cid}", "instagram upload",
-         headers={"Authorization": f"OAuth {c['token']}", "offset": "0", "file_size": str(len(data))},
-         data=data, timeout=600, sleep=sleep)
+    for attempt in range(1, MAX_TRIES + 1):
+        # no share_to_feed: Meta's resumable flow doesn't use it, and Reels show in the feed anyway
+        cont = call("POST", f"{g}/{c['ig_id']}/media", "instagram container", data={
+            "media_type": "REELS", "upload_type": "resumable", "caption": caption,
+            "is_ai_generated": "true", "access_token": c["token"]}, sleep=sleep)
+        cid = cont["id"]
+        try:
+            call("POST", cont.get("uri") or f"https://rupload.facebook.com/ig-api-upload/{ver}/{cid}",
+                 "instagram upload", headers={"Authorization": f"OAuth {c['token']}", "offset": "0",
+                                              "file_size": str(len(data))}, data=data, timeout=600, sleep=sleep)
+            break
+        except MetaError as e:
+            # rupload randomly answers ProcessingFailedError ("retriable": false) for the same file that
+            # uploads fine a minute later (tested Oct 2026): a fresh container is the cure. Unpublished
+            # containers are invisible and expire after 24 h, so this never makes duplicates.
+            if "ProcessingFailedError" not in str(e.body) or attempt == MAX_TRIES:
+                raise
+            sleep(10 * attempt)
     t0 = time.time()
     while True:  # Instagram processes the video before it can be published
         stt = call("GET", f"{g}/{cid}", "instagram status", params={"fields": "status_code,status",
