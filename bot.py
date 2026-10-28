@@ -166,11 +166,45 @@ def is_short_channel(key):
 
 
 class CaptionView(discord.ui.View):
-    """What stays on a card after Approve: the caption buttons for Facebook / Instagram."""
+    """What stays on a card after Approve: the caption buttons, plus "Retry <platform>" for every
+    platform whose post failed."""
 
-    def __init__(self, key, name):
+    def __init__(self, key, name, retry=()):
         super().__init__(timeout=None)
         caption_buttons(self, key, name, row=0)
+        from pipeline.crosspost import NAMES
+        for net in retry:
+            cid = f"xp:{net}:{key}/{name}"
+            if len(cid) <= 100:  # Discord's custom_id limit
+                self.add_item(discord.ui.Button(label=f"Retry {NAMES.get(net, net)}", emoji="🔁", row=1,
+                                                style=discord.ButtonStyle.danger, custom_id=cid))
+
+
+def uploaded_meta(key, name):
+    try:
+        return json.loads((Path(cfg["output_dir"]) / "uploaded" / key / name / "meta.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def card_text(key, name):
+    """Approved card: header (who / YouTube) + one line per platform + the pack folder."""
+    from pipeline.crosspost import platform_lines
+    m = uploaded_meta(key, name)
+    parts = [m.get("card_header", "")] + platform_lines(m)
+    if m.get("crosspost_pack"):
+        parts.append(f"📦 Pack: {m['crosspost_pack']}")
+    return "\n".join(p for p in parts if p)[:1990]
+
+
+def save_card_header(key, name, header):
+    f = Path(cfg["output_dir"]) / "uploaded" / key / name / "meta.json"
+    try:
+        m = json.loads(f.read_text(encoding="utf-8"))
+        m["card_header"] = header
+        f.write_text(json.dumps(m, ensure_ascii=False, indent=2), encoding="utf-8")
+    except (OSError, ValueError):
+        pass
 
 
 def find_video(key, name):
@@ -288,6 +322,8 @@ async def on_interaction(inter: discord.Interaction):
         return await handle_idea(inter, cid)
     if cid.startswith("tp:"):
         return await handle_topic(inter, cid)
+    if cid.startswith("xp:"):
+        return await handle_retry(inter, cid)
     if not cid.startswith("fp:"):
         return
     _, action, rest = cid.split(":", 2)
@@ -310,11 +346,37 @@ async def on_interaction(inter: discord.Interaction):
         await msg.edit(view=keep, content=note + " - uploading...")
         try:
             url, slot = await asyncio.to_thread(core.upload_one, cfg, key, dest)
-            note += f"\n{upload_note(slot)}\n{url}"
-            note += upload_warnings(key, dest.name)
+            warn = "".join(f"\n⚠️ {w}" for w in uploaded_meta(key, dest.name).get("upload_warnings", []))
+            save_card_header(key, dest.name, f"{note}\n▶️ YouTube ✅ {url}\n{upload_note(slot)}{warn}")
+            from pipeline.crosspost import failed_platforms
+            keep = CaptionView(key, dest.name, failed_platforms(uploaded_meta(key, dest.name)))
+            return await msg.edit(view=keep, content=card_text(key, dest.name))
         except BaseException as e:  # SystemExit from missing auth too
-            note += f"\nUpload failed: {e}\nFix it, then tap Upload approved."
+            note += f"\n▶️ YouTube ❌ upload failed: {e}\nFix it, then tap Upload approved."
     await msg.edit(view=keep, content=note[:1990])
+
+
+RETRYING = set()
+
+
+async def handle_retry(inter, cid):
+    """Retry one platform for an uploaded video (button on the approved card)."""
+    from pipeline.crosspost import failed_platforms, post_platforms
+    _, net, rest = cid.split(":", 2)
+    key, name = rest.split("/", 1)
+    folder = Path(cfg["output_dir"]) / "uploaded" / key / name
+    if not (folder / "meta.json").exists():
+        return await inter.response.send_message("That video is no longer in uploaded/.", ephemeral=True)
+    if cid in RETRYING:
+        return await inter.response.send_message("Already retrying.", ephemeral=True)
+    RETRYING.add(cid)
+    try:
+        await inter.response.defer()
+        await asyncio.to_thread(post_platforms, cfg, key, folder, None, [net], True)
+        await inter.message.edit(content=card_text(key, name),
+                                 view=CaptionView(key, name, failed_platforms(uploaded_meta(key, name))))
+    finally:
+        RETRYING.discard(cid)
 
 
 REMAKING = set()
@@ -343,15 +405,6 @@ async def do_new_footage(inter, key, folder):
     finally:
         REMAKING.discard(folder)
 
-
-def upload_warnings(key, name):
-    meta_f = Path(cfg["output_dir"]) / "uploaded" / key / name / "meta.json"
-    try:
-        m = json.loads(meta_f.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return ""
-    return ("".join(f"\n⚠️ {w}" for w in m.get("upload_warnings", []))
-            + "".join(f"\n{n}" for n in m.get("crosspost", [])))
 
 
 # ---------------- jobs ----------------
@@ -409,6 +462,10 @@ async def daily_loop():
     await bot.wait_until_ready()
     await say(f"**{MACHINE}** online. Daily run at {state['daily_time']}"
               f"{' (PAUSED)' if state['paused'] else ''}.\n{schedule_text()}")
+    from pipeline.crosspost import validate_crosspost
+    probs = validate_crosspost(cfg)
+    if probs:  # config mistakes that could post to the wrong account or never post
+        await say("⚠️ Cross-post config:\n" + "\n".join(f"• {p}" for p in probs))
     await post_panel()
     while not bot.is_closed():
         now = datetime.now()
@@ -589,7 +646,8 @@ async def do_upload(inter):
                 continue
             try:
                 url, slot = await asyncio.to_thread(core.upload_one, cfg, k, p)
-                lines.append(f"✅ {upload_note(slot)} {url}" + upload_warnings(k, p.name))
+                save_card_header(k, p.name, f"▶️ YouTube ✅ {url}\n{upload_note(slot)}")
+                lines.append(card_text(k, p.name))
             except BaseException as e:
                 lines.append(f"❌ {p.name}: {str(e)[:200]}")
     await inter.followup.send("\n".join(lines) or "Nothing approved to upload.")
@@ -1270,6 +1328,22 @@ async def crosspost_cmd(inter: discord.Interaction, channel: app_commands.Choice
         lines = [result_line(r) for r in results] or [
             f"No platform is switched on for {channel.name} (config.yaml channels.{channel.value}.crosspost)."]
         await say(f"**{title}**\n" + "\n".join(lines))
+    await guarded(inter, go)
+
+
+@bot.tree.command(name="platforms", description="Which platforms a channel posts to, and whether each login works")
+@app_commands.choices(channel=XP_CHOICES)
+async def platforms_cmd(inter: discord.Interaction, channel: app_commands.Choice[str]):
+    from pipeline.crosspost import platform_status, validate_crosspost
+
+    async def go(i):
+        await i.response.defer()
+        lines = await asyncio.to_thread(platform_status, cfg, channel.value)
+        probs = [p for p in validate_crosspost(cfg) if p.startswith(channel.value + ":")]
+        text = f"**{channel.name} - platforms**\n" + "\n".join(lines)
+        if probs:
+            text += "\n⚠️ " + "\n⚠️ ".join(probs)
+        await i.followup.send(text[:1990])
     await guarded(inter, go)
 
 

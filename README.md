@@ -454,6 +454,18 @@ Nothing is posted until you tap **Approve** (same as YouTube). A failed Facebook
 never touches the YouTube upload. Each platform is posted once per video (`meta.json`
 "platforms"); `--force` posts again. Every post is a row in `uploads.csv` (`Platform`, `URL`).
 
+### In Discord
+- After **Approve** the card shows one line per platform: `▶️ YouTube ✅ link`,
+  `📘 Facebook ✅ link`, `🎵 TikTok 📥 sent to drafts` (+ the caption to paste), or `❌ error`.
+  Every failed platform gets a **Retry <platform>** button (only that platform is posted again;
+  spec problems such as a too-long video are not retried).
+- `/crosspost <channel> <"last" or part of the folder name> [force]` - push an already-uploaded
+  video to the channel's platforms (each platform only once unless `force`).
+- `/platforms <channel>` - which platforms are on, and whether each login works (and when it
+  expires).
+- At start the bot checks `channels.<key>.crosspost` and warns about mistakes (same Page or TikTok
+  account on two channels, enabled without page_id / display_name, unknown platform names).
+
 ### Facebook Reels (`pipeline/facebook.py`, Graph API v26.0)
 - Reels publishing flow: start -> upload the file -> finish, then waits until Facebook has
   processed it. `is_ai_generated` is set (our voices are AI). `mode: schedule` uses the YouTube

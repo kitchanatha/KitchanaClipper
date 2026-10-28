@@ -79,6 +79,8 @@ def make_pack(cfg, key, folder, youtube_url=None):
     if youtube_url:
         text += f"\n\nYouTube: {youtube_url}\n"
     (pack / f"caption_{lang}.txt").write_text(text, encoding="utf-8")
+    meta["crosspost_pack"] = str(pack)
+    (folder / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     return pack
 
 
@@ -171,16 +173,110 @@ def _post_tiktok(cfg, key, folder, cap, slot):
 
 POSTERS = {"facebook": _post_facebook, "instagram": _post_instagram, "tiktok": _post_tiktok}
 ICONS = {"facebook": "📘", "instagram": "📸", "tiktok": "🎵"}
+NAMES = {"facebook": "Facebook", "instagram": "Instagram", "tiktok": "TikTok"}
 
 
 def result_line(r):
-    name = r["platform"].title()
+    name = NAMES.get(r["platform"], r["platform"].title())
     if r.get("ok") and r.get("draft"):
         cap = f"\nCaption to paste:\n```\n{r['caption']}\n```" if r.get("caption") else ""
         return f"{ICONS.get(r['platform'], '')} {name} 📥 {r.get('note', 'draft sent')}{cap}"
     if r.get("ok"):
         return f"{ICONS.get(r['platform'], '')} {name} ✅ {r.get('url', '')} {('(' + r['note'] + ')') if r.get('note') else ''}".strip()
     return f"{ICONS.get(r['platform'], '')} {name} ❌ {r.get('error', '')[:300]}"
+
+
+PLATFORM_ORDER = ("facebook", "instagram", "tiktok")
+
+
+def platform_lines(meta):
+    """One line per platform from the latest results (Discord card / upload message)."""
+    last = meta.get("crosspost_results") or {}
+    return [result_line(last[n]) for n in PLATFORM_ORDER if n in last]
+
+
+def failed_platforms(meta):
+    """Platforms whose last try failed for a reason a retry can fix (not 'switched off' / specs)."""
+    last = meta.get("crosspost_results") or {}
+    return [n for n in PLATFORM_ORDER if n in last and not last[n].get("ok") and not last[n].get("skipped")]
+
+
+KNOWN = {"facebook", "instagram", "tiktok", "caption_style"}
+
+
+def validate_crosspost(cfg):
+    """Config mistakes that could post to the wrong place or never post. [] = fine."""
+    problems, pages, tiktoks = [], {}, {}
+    for key, ch in cfg.get("channels", {}).items():
+        xp = ch.get("crosspost")
+        if xp is None:
+            continue
+        if not isinstance(xp, dict):
+            problems.append(f"{key}: crosspost must be a mapping")
+            continue
+        for extra in sorted(set(xp) - KNOWN):
+            problems.append(f"{key}: unknown crosspost platform '{extra}' (use facebook / instagram / tiktok)")
+        fb = xp.get("facebook") or {}
+        pid = str(fb.get("page_id") or "").strip()
+        if fb.get("mode", "publish") not in ("publish", "schedule"):
+            problems.append(f"{key}: facebook.mode must be publish or schedule, not '{fb.get('mode')}'")
+        if fb.get("enabled") and not pid.isdigit():
+            problems.append(f"{key}: facebook is enabled but page_id is empty / not a number")
+        if pid:
+            if pid in pages:
+                problems.append(f"{key}: facebook page_id {pid} is also used by {pages[pid]} - one Page per channel")
+            pages[pid] = key
+        ig = xp.get("instagram") or {}
+        if ig.get("enabled") and not str(ig.get("ig_id") or "").strip():
+            problems.append(f"{key}: instagram is enabled but ig_id is empty")
+        if ig.get("enabled") and not fb.get("page_id"):
+            problems.append(f"{key}: instagram needs the facebook page_id (it uses the Page token)")
+        tt = xp.get("tiktok") or {}
+        if tt.get("mode", "draft") != "draft":
+            problems.append(f"{key}: tiktok.mode must be draft (direct posting is not set up)")
+        name = str(tt.get("display_name") or "").strip()
+        if tt.get("enabled") and not name:
+            problems.append(f"{key}: tiktok is enabled without display_name - set it so a wrong account is refused")
+        if name:
+            if name in tiktoks:
+                problems.append(f"{key}: tiktok display_name '{name}' is also used by {tiktoks[name]}")
+            tiktoks[name] = key
+    return problems
+
+
+def platform_status(cfg, key):
+    """Lines for /platforms: what is switched on and whether its login works."""
+    from .common import ROOT as root
+    xp = channel_xp(cfg, key)
+    ch = cfg["channels"][key]
+    yt = (root / ch.get("youtube_token", f"tokens/{key}.json")).exists()
+    lines = [f"▶️ YouTube: {'✅ connected' if yt else '❌ not connected - python run.py auth --channel ' + key}"]
+    for net in PLATFORM_ORDER:
+        conf = xp.get(net) or {}
+        on = bool(conf.get("enabled"))
+        if net == "facebook":
+            from .facebook import token_status
+            st = token_status(cfg, key) if (on or conf.get("page_id")) else None
+        elif net == "tiktok":
+            from .tiktok import token_status
+            st = token_status(cfg, key) if (on or (root / "tokens" / f"tiktok_{key}.json").exists()) else None
+        else:
+            st = None
+            if on:
+                from .facebook import token_status
+                st = token_status(cfg, key)
+                if st.get("ok") and not str(conf.get("ig_id") or ""):
+                    st = {"ok": False, "problem": "ig_id missing"}
+        state = "on" if on else "off"
+        if st is None:
+            detail = "not set up"
+        elif st.get("ok"):
+            who = st.get("page_name") or st.get("display_name") or ""
+            detail = f"✅ {who} - token valid, expires {st.get('expires', '?')}"
+        else:
+            detail = f"❌ {st.get('problem')}"
+        lines.append(f"{ICONS.get(net, '')} {NAMES[net]} ({state}): {detail}")
+    return lines
 
 
 def post_platforms(cfg, key, folder, slot=None, only=None, force=False, log=print):
@@ -212,7 +308,11 @@ def post_platforms(cfg, key, folder, slot=None, only=None, force=False, log=prin
         if r.get("ok"):
             done[net] = {"url": r["url"], "note": r.get("note", ""), "at": datetime.now().isoformat(timespec="seconds")}
             _log_csv(cfg, key, meta, net, r["url"])
-    meta["crosspost"] = [result_line(r) for r in results]
+    last = meta.setdefault("crosspost_results", {})
+    for r in results:
+        if not (r.get("note") == "already posted" and r["platform"] in last):
+            last[r["platform"]] = r
+    meta["crosspost"] = platform_lines(meta)
     (folder / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     return results
 
