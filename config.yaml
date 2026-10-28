@@ -357,7 +357,7 @@ channels:
     latest_color: "#E63946"               # the "ล่าสุด" (latest) dot and pill
     youtube_token: tokens/summed_up.json
     crosspost:              # opt-in per platform; posted only after your Approve in Discord
-      facebook: {enabled: false, page_id: "1384662268056735", mode: publish}   # publish | schedule (= YouTube slot)
+      facebook: {enabled: true, page_id: "1384662268056735", mode: publish}   # publish | schedule (= YouTube slot)
       instagram: {enabled: false, ig_id: ""}                   # uses the Facebook Page token
       tiktok: {enabled: false, mode: draft}                    # draft = TikTok inbox, you tap Post
       caption_style: short
