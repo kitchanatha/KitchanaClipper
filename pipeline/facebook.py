@@ -30,7 +30,9 @@ import requests
 from .common import ROOT, env
 
 SCOPES = ["pages_show_list", "pages_read_engagement", "pages_manage_posts"]
-IG_SCOPES = ["instagram_basic", "instagram_content_publish"]  # only when the channel's instagram is on
+# only when the channel's instagram is on. business_management: linking Instagram can move the Page
+# into a business portfolio, and business-owned Pages are only listed with this permission.
+IG_SCOPES = ["instagram_basic", "instagram_content_publish", "business_management"]
 REDIRECT = "http://localhost:8765/fb-callback"
 TRANSIENT_CODES = {1, 2, 4, 17, 341, 368}  # Meta "temporary / rate" error codes worth one more try
 MAX_TRIES = 3
@@ -156,7 +158,10 @@ def auth(cfg, key, page_id=None, open_browser=True):
                          f"(channels.{key}.crosspost.facebook.page_id) and run fb-auth again.")
     page = next((p for p in pages if p["id"] == want), None)
     if not page:
-        raise SystemExit(f"Page {want} is not in the Pages you allowed. Run fb-auth again and tick that Page.")
+        got = ", ".join(f"{p['name']} ({p['id']})" for p in pages) or "none"
+        raise SystemExit(f"Page {want} is not in the Pages you allowed (Facebook returned: {got}). If none, "
+                         f"you are probably logged in AS a Page - switch back to your personal profile on "
+                         f"facebook.com. Then run fb-auth again and tick that Page.")
     if "CREATE_CONTENT" not in (page.get("tasks") or []):
         raise SystemExit(f"Your account can't create content on '{page['name']}' (tasks: {page.get('tasks')}).")
     me = call("GET", f"{g}/me", "verify Page token", params={"fields": "id,name", "access_token": page["access_token"]})
