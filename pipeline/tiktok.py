@@ -123,8 +123,14 @@ def _catch_code(state, wait_s=300):
             if u.path == "/tiktok-callback":
                 got.update({k: v[0] for k, v in parse_qs(u.query).items()})
                 ok = "code" in got and got.get("state") == state
-                msg = ("TikTok connected - you can close this tab and go back to the terminal." if ok
-                       else f"Login failed: {got.get('error_description') or got.get('error') or 'no code'}")
+                if ok:
+                    msg = "TikTok connected - you can close this tab and go back to the terminal."
+                elif "code" in got:  # a tab from an older login attempt
+                    msg = ("This login tab is from an older attempt (state does not match). Close the old "
+                           "TikTok tabs and run tiktok-auth again.")
+                    got.clear()  # keep waiting for the right tab
+                else:
+                    msg = f"Login failed: {got.get('error_description') or got.get('error') or 'no code'}"
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.end_headers()
