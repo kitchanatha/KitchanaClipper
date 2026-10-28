@@ -1,12 +1,13 @@
 """After a video is approved and uploaded to YouTube.
 
 1. Cross-post pack (every video): output/crosspost/<channel>/<date>_<slug>/ with video.mp4 and
-   caption_<lang>.txt - a Facebook Reels / Instagram caption and a shorter TikTok caption with
-   hashtags, plus a sources line for news. Upload it from your phone/PC (TikTok is never automatic).
-2. Facebook Reels + Instagram Reels (optional, per channel in config `crosspost.channels`): posted
-   through Meta's official Graph API - only after your Approve in Discord, only when the channel is
-   switched on and its tokens are in .env (META_PAGE_ID_<KEY>, META_PAGE_TOKEN_<KEY>,
-   META_IG_ID_<KEY>; see README). Problems are reported, never fatal: the YouTube upload stands.
+   caption_<lang>.txt - Facebook / Instagram caption and a shorter TikTok caption with hashtags,
+   plus sources for news.
+2. Per channel, opt-in in config.yaml (channels.<key>.crosspost):
+   facebook  -> Reel on the channel's own Page (pipeline/facebook.py, tokens/facebook_<key>.json)
+   instagram -> Reel on the linked Instagram account (same Page token + instagram.ig_id)
+   Only after your Approve in Discord. Problems are reported, never fatal: the YouTube upload stands.
+   Each platform is posted once per video (meta.json "platforms"); force=True posts again.
 """
 import json
 import os
@@ -49,8 +50,9 @@ def captions(cfg, key, meta):
     base = "\n\n".join(x for x in [meta.get("title", ""), desc, src, " ".join(tags[:6])] if x)
     fb = social.get("facebook") or base
     ig = social.get("instagram") or base
-    if src and src not in fb:
-        fb += "\n\n" + src
+    if src:  # news: the full source lines from the YouTube description (rule: sources everywhere)
+        links = [ln.strip() for ln in (meta.get("description") or "").split("\n") if "http" in ln]
+        fb += "\n\n" + ("แหล่งข่าว:\n" + "\n".join(links) if links else src)
     if src and src not in ig:
         ig += "\n\n" + src
     tt = meta.get("title", "")
@@ -82,14 +84,17 @@ def make_pack(cfg, key, folder, youtube_url=None):
 
 # ---------------------------------------------------------------- Meta Graph API
 
-def _env(name):
-    return os.environ.get(name, "").strip()
+def channel_xp(cfg, key):
+    """channels.<key>.crosspost -> {facebook: {...}, instagram: {...}, tiktok: {...}}."""
+    return cfg["channels"][key].get("crosspost") or {}
 
 
-def meta_creds(key):
-    k = key.upper()
-    return {"page_id": _env(f"META_PAGE_ID_{k}"), "token": _env(f"META_PAGE_TOKEN_{k}"),
-            "ig_id": _env(f"META_IG_ID_{k}")}
+def meta_creds(cfg, key):
+    from .facebook import fb_settings, load_token
+    t = load_token(key) or {}
+    ig = channel_xp(cfg, key).get("instagram") or {}
+    return {"page_id": fb_settings(cfg, key)["page_id"], "token": t.get("page_token", ""),
+            "ig_id": str(ig.get("ig_id") or "")}
 
 
 def _check(r, what):
@@ -98,29 +103,14 @@ def _check(r, what):
     return r.json()
 
 
-def post_facebook_reel(cfg, key, video, caption):
-    """Facebook Page Reel (start -> upload -> finish). Returns the reel URL."""
-    ver = _settings(cfg).get("graph_version", "v23.0")
-    c = meta_creds(key)
-    api = f"https://graph.facebook.com/{ver}/{c['page_id']}/video_reels"
-    start = _check(requests.post(api, data={"upload_phase": "start", "access_token": c["token"]},
-                                 timeout=60), "facebook start")
-    vid = start["video_id"]
-    data = Path(video).read_bytes()
-    up = requests.post(start.get("upload_url") or f"https://rupload.facebook.com/video-upload/{ver}/{vid}",
-                       headers={"Authorization": f"OAuth {c['token']}", "offset": "0",
-                                "file_size": str(len(data))}, data=data, timeout=600)
-    _check(up, "facebook upload")
-    _check(requests.post(api, data={"upload_phase": "finish", "video_id": vid, "video_state": "PUBLISHED",
-                                    "description": caption, "access_token": c["token"]}, timeout=60),
-           "facebook publish")
-    return f"https://www.facebook.com/reel/{vid}"
-
-
 def post_instagram_reel(cfg, key, video, caption, wait_s=600):
     """Instagram Reel (resumable upload -> wait until processed -> publish). Returns the permalink."""
-    ver = _settings(cfg).get("graph_version", "v23.0")
-    c = meta_creds(key)
+    from .facebook import graph_version, token_status
+    st = token_status(cfg, key)
+    if not st["ok"]:
+        raise RuntimeError(st["problem"])
+    ver = graph_version(cfg)
+    c = meta_creds(cfg, key)
     g = f"https://graph.facebook.com/{ver}"
     cont = _check(requests.post(f"{g}/{c['ig_id']}/media", data={
         "media_type": "REELS", "upload_type": "resumable", "caption": caption,
@@ -149,8 +139,76 @@ def post_instagram_reel(cfg, key, video, caption, wait_s=600):
     return link.get("permalink") or f"instagram media {media['id']}"
 
 
-def crosspost(cfg, key, folder, youtube_url=None, log=print):
-    """Pack + optional Facebook / Instagram posting. Returns notes for Discord; never raises."""
+def _post_facebook(cfg, key, folder, cap, slot):
+    from .facebook import publish_reel, video_problems
+    bad = video_problems(folder / "video.mp4")
+    if bad:
+        return {"platform": "facebook", "ok": False, "skipped": True,
+                "error": "not posted - " + "; ".join(bad)}
+    url, note = publish_reel(cfg, key, folder / "video.mp4", cap["facebook"], slot)
+    return {"platform": "facebook", "ok": True, "url": url, "note": note}
+
+
+def _post_instagram(cfg, key, folder, cap, slot):
+    if not meta_creds(cfg, key)["ig_id"]:
+        return {"platform": "instagram", "ok": False, "skipped": True,
+                "error": f"instagram.ig_id missing in channels.{key}.crosspost"}
+    return {"platform": "instagram", "ok": True,
+            "url": post_instagram_reel(cfg, key, folder / "video.mp4", cap["instagram"])}
+
+
+POSTERS = {"facebook": _post_facebook, "instagram": _post_instagram}
+ICONS = {"facebook": "📘", "instagram": "📸", "tiktok": "🎵"}
+
+
+def result_line(r):
+    name = r["platform"].title()
+    if r.get("ok"):
+        return f"{ICONS.get(r['platform'], '')} {name} ✅ {r.get('url', '')} {('(' + r['note'] + ')') if r.get('note') else ''}".strip()
+    return f"{ICONS.get(r['platform'], '')} {name} ❌ {r.get('error', '')[:300]}"
+
+
+def post_platforms(cfg, key, folder, slot=None, only=None, force=False, log=print):
+    """Post an uploaded video to the channel's enabled platforms. Returns result dicts; never raises.
+    only: list of platforms (e.g. ["facebook"]); force: post again even if already posted."""
+    folder = Path(folder)
+    meta = json.loads((folder / "meta.json").read_text(encoding="utf-8"))
+    xp = channel_xp(cfg, key)
+    cap = captions(cfg, key, meta)
+    done = meta.setdefault("platforms", {})
+    results = []
+    for net, fn in POSTERS.items():
+        if only and net not in only:
+            continue
+        if not (xp.get(net) or {}).get("enabled"):
+            if only:
+                results.append({"platform": net, "ok": False, "skipped": True,
+                                "error": f"switched off in config.yaml (channels.{key}.crosspost.{net})"})
+            continue
+        if done.get(net, {}).get("url") and not force:
+            results.append({"platform": net, "ok": True, "url": done[net]["url"], "note": "already posted"})
+            continue
+        try:
+            log(f"  posting to {net}...")
+            r = fn(cfg, key, folder, cap, slot)
+        except Exception as e:
+            r = {"platform": net, "ok": False, "error": str(e)[:400]}
+        results.append(r)
+        if r.get("ok"):
+            done[net] = {"url": r["url"], "note": r.get("note", ""), "at": datetime.now().isoformat(timespec="seconds")}
+            _log_csv(cfg, key, meta, net, r["url"])
+    meta["crosspost"] = [result_line(r) for r in results]
+    (folder / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    return results
+
+
+def _log_csv(cfg, key, meta, platform, url):
+    import run as core
+    core.log_upload(cfg, key, meta, datetime.now(), url, platform)
+
+
+def crosspost(cfg, key, folder, youtube_url=None, slot=None, log=print):
+    """Pack + the channel's enabled platforms. Returns notes for Discord; never raises."""
     s = _settings(cfg)
     notes = []
     folder = Path(folder)
@@ -160,25 +218,21 @@ def crosspost(cfg, key, folder, youtube_url=None, log=print):
             notes.append(f"📦 Cross-post pack (TikTok etc.): {pack}")
     except Exception as e:
         notes.append(f"📦 pack failed: {str(e)[:200]}")
-    want = (s.get("channels") or {}).get(key) or {}
-    meta = json.loads((folder / "meta.json").read_text(encoding="utf-8"))
-    cap = captions(cfg, key, meta)
-    c = meta_creds(key)
-    env_name = {"page_id": "META_PAGE_ID_", "token": "META_PAGE_TOKEN_", "ig_id": "META_IG_ID_"}
-    for net, fn, needs in (("facebook", post_facebook_reel, ("page_id", "token")),
-                           ("instagram", post_instagram_reel, ("ig_id", "token"))):
-        if not want.get(net):
-            continue
-        missing = [env_name[n] + key.upper() for n in needs if not c[n]]
-        if missing:
-            notes.append(f"{net}: switched on but {', '.join(missing)} not in .env - skipped")
-            continue
-        try:
-            log(f"  posting to {net}...")
-            url = fn(cfg, key, folder / "video.mp4", cap[net])
-            notes.append(f"{'📘' if net == 'facebook' else '📸'} {net.title()}: {url}")
-        except Exception as e:
-            notes.append(f"{net} post failed: {str(e)[:300]} - post the pack by hand")
-    meta["crosspost"] = notes
-    (folder / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        notes += [result_line(r) for r in post_platforms(cfg, key, folder, slot, log=log)]
+    except Exception as e:
+        notes.append(f"cross-post failed: {str(e)[:300]}")
     return notes
+
+
+def find_uploaded(cfg, key, which="last"):
+    """An uploaded video folder of this channel: 'last' or a (partial) folder name."""
+    import run as core
+    base = core.dirs(cfg)["uploaded"] / key
+    folders = sorted((p for p in base.glob("*") if (p / "meta.json").exists()), key=lambda p: p.name)
+    if not folders:
+        return None
+    if which in (None, "", "last"):
+        return folders[-1]
+    hits = [p for p in folders if which in p.name]
+    return hits[-1] if hits else None

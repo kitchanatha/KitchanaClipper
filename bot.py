@@ -1246,6 +1246,33 @@ async def channel_disable(inter: discord.Interaction, channel: app_commands.Choi
     await guarded(inter, go)
 
 
+XP_CHOICES = [app_commands.Choice(name=cfg["channels"][k]["name"], value=k)
+              for k in REVIEW_KEYS if cfg["channels"][k].get("crosspost")]
+
+
+@bot.tree.command(name="crosspost", description="Post an already-uploaded video to the channel's Facebook / other platforms")
+@app_commands.choices(channel=XP_CHOICES)
+@app_commands.describe(video='"last", or (part of) the video folder name', force="post again even if already posted")
+async def crosspost_cmd(inter: discord.Interaction, channel: app_commands.Choice[str], video: str = "last",
+                        force: bool = False):
+    from pipeline.crosspost import find_uploaded, post_platforms, result_line
+
+    async def go(i):
+        if not only_control(i):
+            return await i.response.send_message("Use the control channel.", ephemeral=True)
+        folder = find_uploaded(cfg, channel.value, video)
+        if not folder:
+            return await i.response.send_message(f"No uploaded {channel.name} video matching `{video}`.",
+                                                 ephemeral=True)
+        title = json.loads((folder / "meta.json").read_text(encoding="utf-8")).get("title", folder.name)
+        await i.response.send_message(f"Cross-posting **{title}** ({channel.name})...")
+        results = await asyncio.to_thread(post_platforms, cfg, channel.value, folder, None, None, force)
+        lines = [result_line(r) for r in results] or [
+            f"No platform is switched on for {channel.name} (config.yaml channels.{channel.value}.crosspost)."]
+        await say(f"**{title}**\n" + "\n".join(lines))
+    await guarded(inter, go)
+
+
 @bot.tree.command(description="Last-7-day YouTube stats for this computer's channels")
 async def report(inter: discord.Interaction):
     async def go(i):

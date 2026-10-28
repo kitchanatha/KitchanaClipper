@@ -11,6 +11,8 @@
   python run.py generate --channel wonder_minute --idea 3       make idea 3 from that list
   python run.py report                                          last-7-day stats -> data/weekly_stats.csv
   python run.py auth-analytics --channel summed_up              optional: avg % viewed in the report
+  python run.py fb-auth --channel wonder_minute                 connect the channel's Facebook Page (once)
+  python run.py crosspost last --channel wonder_minute [--force] post an uploaded video to Facebook etc.
 
 Story mode (Candlelit Tales, README section 7):
   python run.py story-check the-monkeys-paw                     validate rights + show length / cost
@@ -289,24 +291,38 @@ def upload_one(cfg, key, folder):
     meta = json.loads((folder / "meta.json").read_text(encoding="utf-8"))
     vid, slot = upload(cfg, key, ch, folder)
     url = f"https://youtube.com/shorts/{vid}"
-    log = ROOT / "uploads.csv"
-    new = not log.exists()
-    with open(log, "a", newline="", encoding="utf-8-sig") as f:
-        w = csv.writer(f)
-        if new:
-            w.writerow(["Publish Date", "Channel", "Title", "Video URL", "Length (sec)", "Topic"])
-        w.writerow([slot.strftime("%Y-%m-%d %H:%M"), ch["name"], meta["title"], url,
-                    meta["length_sec"], meta.get("topic", "")])
+    log_upload(cfg, key, meta, slot, url, "YouTube")
     dest = dirs(cfg)["uploaded"] / key / folder.name
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(folder), str(dest))
     try:  # cross-post pack + optional Facebook / Instagram (never undoes the YouTube upload)
         from pipeline.crosspost import crosspost
-        for note in crosspost(cfg, key, dest, url):
+        for note in crosspost(cfg, key, dest, url, slot):
             print(f"[{key}] {note}")
     except Exception as e:
         print(f"[{key}] cross-post skipped: {e}")
     return url, slot
+
+
+CSV_HEADER = ["Publish Date", "Channel", "Title", "Video URL", "Length (sec)", "Topic", "Platform", "URL"]
+
+
+def log_upload(cfg, key, meta, when, url, platform):
+    """One row per platform in uploads.csv (old files get the Platform / URL columns added)."""
+    log = ROOT / "uploads.csv"
+    if log.exists():
+        lines = log.read_text(encoding="utf-8-sig").splitlines()
+        if lines and "Platform" not in lines[0]:
+            lines[0] = ",".join(CSV_HEADER)
+            log.write_text("\n".join(lines) + "\n", encoding="utf-8-sig")
+    new = not log.exists()
+    with open(log, "a", newline="", encoding="utf-8-sig") as f:
+        w = csv.writer(f)
+        if new:
+            w.writerow(CSV_HEADER)
+        w.writerow([when.strftime("%Y-%m-%d %H:%M"), cfg["channels"][key]["name"], meta["title"],
+                    url if platform == "YouTube" else "", meta.get("length_sec", ""), meta.get("topic", ""),
+                    platform, url])
 
 
 def cmd_upload(cfg, channel):
@@ -366,7 +382,7 @@ def main():
     ap.add_argument("command", choices=["generate", "daily", "review", "upload", "auth", "test-video",
                                         "story-check", "story-prep", "story-build", "fonts",
                                         "news-research", "news-show", "news-approve", "news-build",
-                                        "ideas", "report", "auth-analytics"])
+                                        "ideas", "report", "auth-analytics", "fb-auth", "crosspost"])
     ap.add_argument("slug", nargs="?", help="story folder name (story-* commands)")
     ap.add_argument("--lang", help="story languages, e.g. en or en,th,zh (default: all in config)")
     ap.add_argument("--yes", action="store_true", help="story-build: don't ask before paying for audio")
@@ -422,6 +438,21 @@ def main():
         cmd_review(cfg)
     elif a.command == "upload":
         cmd_upload(cfg, a.channel)
+    elif a.command == "fb-auth":
+        if not a.channel:
+            sys.exit("Use --channel, e.g. python run.py fb-auth --channel wonder_minute")
+        from pipeline.facebook import auth as fb_auth
+        fb_auth(cfg, a.channel)
+    elif a.command == "crosspost":
+        if not a.channel:
+            sys.exit("Use --channel, e.g. python run.py crosspost last --channel wonder_minute")
+        from pipeline.crosspost import find_uploaded, post_platforms, result_line
+        folder = find_uploaded(cfg, a.channel, a.slug or "last")
+        if not folder:
+            sys.exit(f"No uploaded video matching '{a.slug or 'last'}' for {a.channel}.")
+        print(f"Cross-posting {folder.name}...")
+        for r in post_platforms(cfg, a.channel, folder, force=a.force):
+            print(result_line(r))
     elif a.command == "auth":
         if not a.channel:
             sys.exit("Use --channel, e.g. python run.py auth --channel mindset_minute")

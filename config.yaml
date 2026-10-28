@@ -96,16 +96,12 @@ claude_code:                # no Anthropic API credit: Claude Code (scheduled ta
                             # own 01:30 run and 07:30 topic finder are skipped; Make video / News /
                             # topic picks / script writing go to the Claude Code queue. README section 12.
 
-crosspost:                  # after a video is approved AND uploaded to YouTube
+crosspost:                  # after a video is approved AND uploaded to YouTube (README section 13)
   pack: true                # output/crosspost/<channel>/<date>_<slug>/: video.mp4 + caption_<lang>.txt
   dir: output/crosspost     # (Facebook/Instagram caption + short TikTok caption, sources for news)
-  graph_version: v23.0      # Meta Graph API version
-  channels:                 # direct posting via Meta's API - needs the tokens in .env (README 11)
-    summed_up: {facebook: false, instagram: false}
-    wonder_minute: {facebook: false, instagram: false}
-    storytime_cuts: {facebook: false, instagram: false}
-  # TikTok is never posted automatically (its API only allows private posts until TikTok audits
-  # your app) - use the pack.
+  graph_version: v26.0      # Meta Graph API version (Reels publishing docs checked Oct 2026)
+  # Which platforms each channel posts to: channels.<key>.crosspost (facebook / instagram / tiktok).
+  # Tokens live in tokens/ (fb-auth / tiktok-auth), app keys in .env - never here.
 
 report:                     # weekly YouTube stats in Discord + data/weekly_stats.csv
   enabled: true
@@ -184,6 +180,11 @@ channels:
     caption_color: "#F5E9FF"
     highlight_color: "#FFB86B"
     youtube_token: tokens/storytime_cuts.json
+    crosspost:              # opt-in per platform; posted only after your Approve in Discord
+      facebook: {enabled: false, page_id: "", mode: publish}   # publish | schedule (= YouTube slot)
+      instagram: {enabled: false, ig_id: ""}                   # uses the Facebook Page token
+      tiktok: {enabled: false, mode: draft}                    # draft = TikTok inbox, you tap Post
+      caption_style: short
     enabled: true
     daily_count: 1
     publish_times: ["18:00"]
@@ -222,6 +223,11 @@ channels:
     caption_color: "#FFFFFF"
     highlight_color: "#3DDCFF"
     youtube_token: tokens/wonder_minute.json
+    crosspost:              # opt-in per platform; posted only after your Approve in Discord
+      facebook: {enabled: false, page_id: "", mode: publish}   # publish | schedule (= YouTube slot)
+      instagram: {enabled: false, ig_id: ""}                   # uses the Facebook Page token
+      tiktok: {enabled: false, mode: draft}                    # draft = TikTok inbox, you tap Post
+      caption_style: short
     enabled: true
     daily_count: 2
     publish_times: ["12:00", "20:30"]   # 8.5 h apart (min_gap_hours)
@@ -350,6 +356,11 @@ channels:
     highlight_color: "#FFD60A"            # accent: date pills, dots, current caption word
     latest_color: "#E63946"               # the "ล่าสุด" (latest) dot and pill
     youtube_token: tokens/summed_up.json
+    crosspost:              # opt-in per platform; posted only after your Approve in Discord
+      facebook: {enabled: false, page_id: "", mode: publish}   # publish | schedule (= YouTube slot)
+      instagram: {enabled: false, ig_id: ""}                   # uses the Facebook Page token
+      tiktok: {enabled: false, mode: draft}                    # draft = TikTok inbox, you tap Post
+      caption_style: short
     daily_count: 1          # one Short a day from the topic finder - only topics you pick + approve
     footage_hint: rain on window, water surface, phone screen scrolling, documents on desk, weather radar map, abstract data
     hashtags: ["#สรุปข่าว", "#สรุปดราม่า", "#สรุปให้ฟัง", "#shorts"]

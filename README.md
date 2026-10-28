@@ -391,27 +391,9 @@ approve) · Candlelit manual. Every video waits for **Approve** in Discord befor
 **Cross-post pack (every upload):** after a video is approved and uploaded to YouTube, the bot
 writes `output/crosspost/<channel>/<date>_<folder>/` with `video.mp4` and `caption_<lang>.txt`
 (a Facebook / Instagram caption, a short TikTok caption with hashtags, and for news a
-"แหล่งข่าว: ..." line). The Discord upload message shows the folder. TikTok is never posted
-automatically: its API only allows private posts until TikTok audits your app - upload the pack.
+"แหล่งข่าว: ..." line). The Discord upload message shows the folder. TikTok drafts: section 13.
 
-**Facebook Reels + Instagram Reels (optional):** posted through Meta's official Graph API right
-after the YouTube upload - only after your Approve, only for channels switched on in
-`config.yaml` -> `crosspost.channels`, and only with tokens in `.env`. Note: Reels go public at
-once, while the YouTube video waits private for you to schedule it.
-
-Setup (once per channel - you do the account steps, never paste tokens in chat):
-1. Instagram: switch the account to **Business** or **Creator** and link it to the channel's
-   Facebook **Page** (Instagram settings -> Account type / Linked accounts).
-2. https://developers.facebook.com -> **Create app** (type "Business"), add the products
-   **Facebook Login for Business** and **Instagram**.
-3. Graph API Explorer: pick your app, add permissions `pages_show_list`, `pages_manage_posts`,
-   `pages_read_engagement`, `instagram_basic`, `instagram_content_publish`, generate a **user
-   token**, then call `GET /me/accounts` and copy your Page's `id` and `access_token` (a Page
-   token made from a long-lived user token does not expire).
-4. `GET /<page-id>?fields=instagram_business_account` -> the Instagram account `id`.
-5. Put them in `.env` (key in upper case): `META_PAGE_ID_SUMMED_UP=`, `META_PAGE_TOKEN_SUMMED_UP=`,
-   `META_IG_ID_SUMMED_UP=`, then set `facebook: true` / `instagram: true` for that channel.
-   While the app is in development mode it can post to Pages / accounts you administer.
+**Facebook Reels / Instagram / TikTok drafts:** see section 13.
 
 **Weekly report:** every Monday 09:00 (`report:` in config; `/report` in Discord or
 `python run.py report` any time) - per channel the last 7 days' videos with views, likes and
@@ -455,6 +437,52 @@ Pro plan instead of the Anthropic API. The Claude app must be open on this PC.
 - **Storytime Cuts**: 3-part horror-mystery series (a new chilling clue at ~20 s, a terrifying twist in
   the final part, no gore), one part a night, Full Story built with Part 3 - approve it a week later.
   The series state is `data/storytime_series.json`.
+
+## 13. Facebook Reels and TikTok drafts (after your Approve)
+
+Per channel, opt-in in `config.yaml`:
+
+```yaml
+  wonder_minute:
+    crosspost:
+      facebook: {enabled: true, page_id: "1234567890", mode: publish}   # publish | schedule
+      instagram: {enabled: false, ig_id: ""}
+      tiktok: {enabled: false, mode: draft}
+```
+
+Nothing is posted until you tap **Approve** (same as YouTube). A failed Facebook / TikTok post
+never touches the YouTube upload. Each platform is posted once per video (`meta.json`
+"platforms"); `--force` posts again. Every post is a row in `uploads.csv` (`Platform`, `URL`).
+
+### Facebook Reels (`pipeline/facebook.py`, Graph API v26.0)
+- Reels publishing flow: start -> upload the file -> finish, then waits until Facebook has
+  processed it. `is_ai_generated` is set (our voices are AI). `mode: schedule` uses the YouTube
+  slot when it is 15 min - 28 days ahead, else posts now.
+- Checked before posting: vertical 9:16, at least 540x960, 24-60 fps, **3-90 s** (so the 16:9
+  long recaps are skipped with a note), max 30 Reels per Page per 24 h, and the saved token must
+  be for exactly this channel's `page_id` (else nothing is posted).
+- Errors: temporary Meta / network errors are retried (max 3 tries, 5 s / 15 s backoff).
+- News captions include the full source list.
+
+**One-time setup (you do the account steps):**
+1. https://developers.facebook.com -> Create app -> use case **"Manage everything on your Page"**
+   -> "I don't want to connect a business portfolio yet" -> create. Keep it in **Development**
+   mode (no App Review needed while only you, the app admin, use it).
+2. In the use case, check the permissions `pages_show_list`, `pages_read_engagement`,
+   `pages_manage_posts`. In the Facebook Login settings add the redirect URI
+   `http://localhost:8765/fb-callback`.
+3. App settings -> Basic: put **App ID** / **App Secret** in `.env` (`META_APP_ID`, `META_APP_SECRET`).
+4. Your Facebook account needs full control of each channel's Page.
+5. `python run.py fb-auth --channel wonder_minute` - the browser opens, you log in to Facebook
+   yourself and allow the Page. Without a `page_id` in config it lists your Pages and their IDs:
+   copy the right one into `channels.<key>.crosspost.facebook.page_id` and run it again. The Page
+   token is saved to `tokens/facebook_<key>.json` (does not expire; git-ignored).
+6. Set `enabled: true`. Test with an old video: `/crosspost` in Discord (channel, `last`) or
+   `python run.py crosspost last --channel wonder_minute`.
+
+### TikTok drafts
+Coming in phase 3 (Content Posting API "Upload": the video lands in the account's TikTok inbox,
+you open TikTok and tap Post).
 
 ## Files
 
