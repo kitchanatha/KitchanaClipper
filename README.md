@@ -492,6 +492,18 @@ never touches the YouTube upload. Each platform is posted once per video (`meta.
 6. Set `enabled: true`. Test with an old video: `/crosspost` in Discord (channel, `last`) or
    `python run.py crosspost last --channel wonder_minute`.
 
+### Instagram Reels (Instagram API with Facebook Login - same Page token)
+- Posted automatically after Approve with the AI label (`is_ai_generated`); resumable upload, then
+  waits until Instagram has processed it. Instagram's upload server sometimes rejects a file at
+  random (`ProcessingFailedError`): the code starts again with a fresh container (max 3 tries).
+  Nothing is visible until the final publish, so retries never make duplicates.
+- Setup per channel: a **new** Instagram account (not your personal one) -> switch to
+  **Professional** -> link it to the channel's Facebook Page (Page Settings > Linked accounts).
+  Meta app: add the use case **"Manage messaging & content on Instagram"** -> **Add required
+  content permissions** (`instagram_basic`, `instagram_content_publish`, `business_management`).
+  Set `instagram: {enabled: true}` and run `fb-auth --channel <key>` again: tick the Page AND the
+  Instagram account in the same login. The account ID is found and saved automatically.
+
 ### TikTok drafts (`pipeline/tiktok.py`, Content Posting API "Upload")
 **`mode: studio` (current choice):** nothing is sent by the API. After Approve the card shows the
 TikTok Studio link (https://www.tiktok.com/tiktokstudio/upload), the video file in the pack folder
