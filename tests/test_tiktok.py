@@ -30,13 +30,17 @@ class ChunkTest(unittest.TestCase):
     def test_small_file_goes_whole(self):
         self.assertEqual(tt.chunk_plan(3 * MB), (3 * MB, 1))
 
-    def test_remainder_joins_last_chunk(self):
-        size, count = tt.chunk_plan(26 * MB)
-        self.assertEqual((size, count), (10 * MB, 2))  # 10 MB + 16 MB (last chunk <= 128 MB)
+    def test_shorts_go_whole(self):  # the 18 MB Short TikTok refused as "10 MB x 1 chunk"
+        self.assertEqual(tt.chunk_plan(18_368_783), (18_368_783, 1))
+        self.assertEqual(tt.chunk_plan(64 * MB), (64 * MB, 1))
+
+    def test_big_file_remainder_joins_last_chunk(self):
+        size, count = tt.chunk_plan(105 * MB)
+        self.assertEqual((size, count), (10 * MB, 10))  # 9 x 10 MB + 15 MB (last chunk <= 128 MB)
 
     def test_chunk_size_kept_in_limits(self):
         self.assertEqual(tt.chunk_plan(200 * MB, chunk=100 * MB)[0], 64 * MB)
-        self.assertEqual(tt.chunk_plan(20 * MB, chunk=1 * MB)[0], 5 * MB)
+        self.assertEqual(tt.chunk_plan(200 * MB, chunk=1 * MB)[0], 5 * MB)
 
 
 class PkceTest(unittest.TestCase):

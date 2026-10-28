@@ -281,9 +281,10 @@ def video_problems(path):
 
 
 def chunk_plan(size, chunk=CHUNK):
-    """(chunk_size, total_chunk_count): < 5 MB whole; else 10 MB chunks, the remainder joins the
-    last chunk (TikTok: total = floor(size / chunk), last chunk up to 128 MB)."""
-    if size < 5 * MB:
+    """(chunk_size, total_chunk_count): up to 64 MB the whole file is one chunk (chunk_size = file
+    size - TikTok refuses a single chunk that differs from it); bigger files go in 10 MB chunks with
+    the remainder in the last one (total = floor(size / chunk), last chunk up to 128 MB)."""
+    if size <= 64 * MB:
         return size, 1
     chunk = min(max(chunk, 5 * MB), 64 * MB)
     return chunk, max(1, math.floor(size / chunk))
