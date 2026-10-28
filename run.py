@@ -166,7 +166,7 @@ def cached_voice(cfg, ch, text, out_mp3, cache_dir=None):
     from pipeline.narrate import chunk_key
     cache_dir = Path(cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
-    k = chunk_key(ch.get("voice_id"), cfg["elevenlabs"]["model_id"], "short", text)
+    k = chunk_key(ch.get("voice_id"), ch.get("model_id") or cfg["elevenlabs"]["model_id"], "short", text)
     mp3, wj = cache_dir / f"{k}.mp3", cache_dir / f"{k}.words.json"
     if mp3.exists() and wj.exists():
         print(f"[{name}] voice from cache (no credits used)")

@@ -34,11 +34,11 @@ def auth_analytics(ch):
     print(f"Saved {p.name}")
 
 
-def _analytics(ch, ids, start, end):
-    """{video_id: average view percentage} or {} without the analytics sign-in."""
+def analytics_service(ch):
+    """YouTube Analytics v2 client from the separate read-only sign-in, or None without it."""
     p = analytics_token(ch)
-    if not p.exists() or not ids:
-        return {}
+    if not p.exists():
+        return None
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
@@ -46,7 +46,14 @@ def _analytics(ch, ids, start, end):
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
         p.write_text(creds.to_json(), encoding="utf-8")
-    ya = build("youtubeAnalytics", "v2", credentials=creds, cache_discovery=False)
+    return build("youtubeAnalytics", "v2", credentials=creds, cache_discovery=False)
+
+
+def _analytics(ch, ids, start, end):
+    """{video_id: average view percentage} or {} without the analytics sign-in."""
+    ya = analytics_service(ch) if ids else None
+    if ya is None:
+        return {}
     out = {}
     for i in range(0, len(ids), 200):
         r = ya.reports().query(ids="channel==MINE", startDate=start.isoformat(), endDate=end.isoformat(),

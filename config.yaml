@@ -215,6 +215,28 @@ channels:
       no graphic violence, no self-harm, no harm to children or animals, no real people or
       places.
 
+  wonder_minute_th:           # Thai versions of Wonder Minute facts, for TikTok only (no YouTube,
+    name: Wonder Minute ไทย    # not in the daily run). Built on request into output/tiktok_th/.
+    language: th
+    voice_id: B4NdgwdU97lHqA8Udh2D   # Kanya - warm, calm Thai narrator (same as สรุปให้ฟัง)
+    model_id: eleven_v4              # reads Thai better than multilingual_v2
+    font: Kanit
+    caption_color: "#FFFFFF"
+    highlight_color: "#3DDCFF"
+    enabled: false
+    daily_count: 0
+    hook_card: true
+    footage_hint: cat, kitten, dog, puppy, wild animals, ocean, space, nature
+    clips_per_keyword: 6
+    footage_match: subject
+    footage_exclude: [ai generated, cartoon, animation, fantasy, monster, illustration, drawing, game,
+                      toy, crowd, protest, police, politics, news, celebrity, child, children, kid, kids,
+                      boy, girl, baby, toddler]
+    hashtags: ["#ความรู้รอบตัว", "#รู้หรือไม่", "#สัตว์โลกน่ารัก"]
+    style: |
+      Thai version of a Wonder Minute fact: natural spoken Thai (not word-for-word translation),
+      payoff first, 20-30 s, ending flows back into the first line so it loops. No follow outro.
+
   wonder_minute:
     name: Wonder Minute
     language: en

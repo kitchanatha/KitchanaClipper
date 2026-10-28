@@ -43,7 +43,7 @@ def tts_with_timestamps(voice, text, out_mp3, model_id, voice_settings,
 
 def make_voice(cfg, ch, text, out_mp3):
     voice = check_voice_id(ch)
-    al = tts_with_timestamps(voice, text, out_mp3, cfg["elevenlabs"]["model_id"],
+    al = tts_with_timestamps(voice, text, out_mp3, ch.get("model_id") or cfg["elevenlabs"]["model_id"],
                              {"stability": 0.45, "similarity_boost": 0.8, "style": 0.3})
     return word_timings(text, al, ch.get("language", "en"))
 

@@ -402,6 +402,12 @@ comments, subscribers, top 3 / bottom 3 and one suggested change; rows are appen
 `python run.py auth-analytics --channel <key>` once per channel - it saves a separate read-only
 token (`tokens/<key>_analytics.json`), so the upload sign-ins are not touched.
 
+**Audience (`/audience` in Discord, also in the Monday report):** per channel, last 28 days vs the
+28 before (ending 2 days ago, like YouTube Studio): views, watch hours, subscribers gained, average
+% viewed, top countries, age groups and male / female, devices, traffic sources (Shorts feed,
+search...) and subscribed vs not. `/audience all` shows every channel in short form. Needs the
+same `auth-analytics` sign-in per channel (`pipeline/audience.py`).
+
 ## 12. Without API credit - Claude Code does the writing
 
 Two scheduled tasks in the Claude desktop app (Code tab -> Scheduled) write the scripts on the

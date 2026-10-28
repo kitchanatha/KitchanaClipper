@@ -1103,6 +1103,22 @@ async def run_report(reason):
         await say(summary(data))
     except BaseException as e:
         await say(f"❌ report failed: `{str(e)[:400]}`")
+    await post_audience(REVIEW_KEYS, compact=True, title="**Audience (last 28 days)**")
+
+
+async def post_audience(keys, compact=False, title=None):
+    """One Discord message per channel (4 full cards don't fit in one 2000-character message)."""
+    from pipeline.audience import audience_all, card
+    try:
+        data = await asyncio.to_thread(audience_all, cfg, keys)
+    except BaseException as e:
+        return await say(f"❌ audience failed: `{str(e)[:400]}`")
+    if title:
+        await say(title)
+    for a in data or []:
+        await say(card(a, compact=compact))
+    if not data:
+        await say("No channel with a YouTube sign-in on this computer.")
 
 
 # ---------------- daily topic finder (สรุปให้ฟัง) ----------------
@@ -1328,6 +1344,21 @@ async def crosspost_cmd(inter: discord.Interaction, channel: app_commands.Choice
         lines = [result_line(r) for r in results] or [
             f"No platform is switched on for {channel.name} (config.yaml channels.{channel.value}.crosspost)."]
         await say(f"**{title}**\n" + "\n".join(lines))
+    await guarded(inter, go)
+
+
+AUD_CHOICES = [app_commands.Choice(name="all channels", value="all")] + [
+    app_commands.Choice(name=cfg["channels"][k]["name"], value=k)
+    for k in REVIEW_KEYS if cfg["channels"][k].get("youtube_token")][:24]
+
+
+@bot.tree.command(name="audience", description="YouTube audience: countries, ages, devices, traffic - last 28 days")
+@app_commands.choices(channel=AUD_CHOICES)
+async def audience_cmd(inter: discord.Interaction, channel: app_commands.Choice[str]):
+    async def go(i):
+        await i.response.send_message(f"Reading YouTube Analytics for {channel.name}...")
+        keys = [c.value for c in AUD_CHOICES[1:]] if channel.value == "all" else [channel.value]
+        await post_audience(keys, compact=channel.value == "all")
     await guarded(inter, go)
 
 
