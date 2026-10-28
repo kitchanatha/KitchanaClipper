@@ -37,7 +37,7 @@ class ValidateTest(unittest.TestCase):
                             "b": chan(tiktok={"enabled": True, "mode": "draft"})}}
         probs = " | ".join(xp.validate_crosspost(cfg))
         for bit in ("page_id is empty", "facebook.mode", "tiktok.mode", "without display_name",
-                    "ig_id is empty", "unknown crosspost platform 'youtube_shorts'"):
+                    "instagram needs the facebook page_id", "unknown crosspost platform 'youtube_shorts'"):
             self.assertIn(bit, probs)
 
 

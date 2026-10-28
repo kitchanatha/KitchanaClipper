@@ -225,7 +225,7 @@ channels:
     youtube_token: tokens/wonder_minute.json
     crosspost:              # opt-in per platform; posted only after your Approve in Discord
       facebook: {enabled: true, page_id: "1362008497000440", mode: publish}   # publish | schedule (= YouTube slot)
-      instagram: {enabled: false, ig_id: ""}                   # uses the Facebook Page token
+      instagram: {enabled: true, ig_id: ""}                     # uses the Facebook Page token
       tiktok: {enabled: true, mode: studio, display_name: "Wonder Minute"}  # studio = you upload in TikTok Studio on the PC; draft = API to the phone inbox
       caption_style: short
     enabled: true

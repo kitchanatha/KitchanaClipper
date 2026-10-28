@@ -30,6 +30,7 @@ import requests
 from .common import ROOT, env
 
 SCOPES = ["pages_show_list", "pages_read_engagement", "pages_manage_posts"]
+IG_SCOPES = ["instagram_basic", "instagram_content_publish"]  # only when the channel's instagram is on
 REDIRECT = "http://localhost:8765/fb-callback"
 TRANSIENT_CODES = {1, 2, 4, 17, 341, 368}  # Meta "temporary / rate" error codes worth one more try
 MAX_TRIES = 3
@@ -131,8 +132,11 @@ def auth(cfg, key, page_id=None, open_browser=True):
     g = f"https://graph.facebook.com/{ver}"
     want = str(page_id or fb_settings(cfg, key)["page_id"]).strip()
     state = secrets.token_urlsafe(16)
+    xp = (cfg["channels"][key].get("crosspost") or {})
+    want_ig = bool((xp.get("instagram") or {}).get("enabled"))
+    scopes = SCOPES + (IG_SCOPES if want_ig else [])
     url = f"https://www.facebook.com/{ver}/dialog/oauth?" + urlencode({
-        "client_id": app_id, "redirect_uri": REDIRECT, "state": state, "scope": ",".join(SCOPES),
+        "client_id": app_id, "redirect_uri": REDIRECT, "state": state, "scope": ",".join(scopes),
         "response_type": "code"})
     print(f"Opening Facebook in your browser - log in yourself and allow the Pages for "
           f"{cfg['channels'][key]['name']}.\nIf it doesn't open, paste this into the browser:\n{url}\n")
@@ -158,14 +162,24 @@ def auth(cfg, key, page_id=None, open_browser=True):
     me = call("GET", f"{g}/me", "verify Page token", params={"fields": "id,name", "access_token": page["access_token"]})
     if me.get("id") != want:
         raise SystemExit(f"Token check failed: got {me} instead of Page {want}.")
+    ig = {}
+    if want_ig:  # the Instagram professional account linked to this Page
+        ig = call("GET", f"{g}/{want}", "linked Instagram", params={
+            "fields": "instagram_business_account{id,username}", "access_token": page["access_token"]}
+                  ).get("instagram_business_account") or {}
+        if not ig.get("id"):
+            raise SystemExit(f"No Instagram professional account is linked to '{page['name']}'. Link it in the "
+                             f"Page's Settings > Linked accounts > Instagram, then run fb-auth again.")
     data = {"channel": key, "page_id": want, "page_name": page["name"], "page_token": page["access_token"],
+            "ig_id": ig.get("id"), "ig_username": ig.get("username"),
             "user_token_expires": (datetime.now(timezone.utc) + timedelta(seconds=int(long.get("expires_in") or 0))
                                    ).isoformat(timespec="seconds") if long.get("expires_in") else None,
             "created": datetime.now().isoformat(timespec="seconds")}
     f = token_file(key)
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"Saved {f.name}: Page '{page['name']}' ({want}). The Page token does not expire.")
+    print(f"Saved {f.name}: Page '{page['name']}' ({want}). The Page token does not expire."
+          + (f"\nInstagram: @{ig.get('username')} ({ig['id']})" if ig.get("id") else ""))
     return data
 
 

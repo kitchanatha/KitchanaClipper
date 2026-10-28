@@ -96,7 +96,8 @@ def meta_creds(cfg, key):
     t = load_token(key) or {}
     ig = channel_xp(cfg, key).get("instagram") or {}
     return {"page_id": fb_settings(cfg, key)["page_id"], "token": t.get("page_token", ""),
-            "ig_id": str(ig.get("ig_id") or "")}
+            "ig_id": str(ig.get("ig_id") or t.get("ig_id") or ""), "ig_username": t.get("ig_username"),
+            "ig_id_token": str(t.get("ig_id") or "")}
 
 
 def _check(r, what):
@@ -105,39 +106,40 @@ def _check(r, what):
     return r.json()
 
 
-def post_instagram_reel(cfg, key, video, caption, wait_s=600):
-    """Instagram Reel (resumable upload -> wait until processed -> publish). Returns the permalink."""
-    from .facebook import graph_version, token_status
+def post_instagram_reel(cfg, key, video, caption, wait_s=300, sleep=time.sleep):
+    """Instagram Reel via the Page token: container (resumable, is_ai_generated) -> upload -> wait
+    until FINISHED (Meta: check about once a minute, max 5 min) -> publish. Returns the permalink."""
+    from .facebook import call, graph_version, token_status
     st = token_status(cfg, key)
     if not st["ok"]:
         raise RuntimeError(st["problem"])
-    ver = graph_version(cfg)
     c = meta_creds(cfg, key)
+    if c["ig_id_token"] and c["ig_id"] != c["ig_id_token"]:  # never post to another channel's account
+        raise RuntimeError(f"config ig_id {c['ig_id']} is not the account linked to this Page "
+                           f"({c['ig_id_token']}) - not posting")
+    ver = graph_version(cfg)
     g = f"https://graph.facebook.com/{ver}"
-    cont = _check(requests.post(f"{g}/{c['ig_id']}/media", data={
-        "media_type": "REELS", "upload_type": "resumable", "caption": caption,
-        "share_to_feed": "true", "access_token": c["token"]}, timeout=60), "instagram container")
+    cont = call("POST", f"{g}/{c['ig_id']}/media", "instagram container", data={
+        "media_type": "REELS", "upload_type": "resumable", "caption": caption, "share_to_feed": "true",
+        "is_ai_generated": "true", "access_token": c["token"]}, sleep=sleep)
     cid = cont["id"]
     data = Path(video).read_bytes()
-    _check(requests.post(cont.get("uri") or f"https://rupload.facebook.com/ig-api-upload/{ver}/{cid}",
-                         headers={"Authorization": f"OAuth {c['token']}", "offset": "0",
-                                  "file_size": str(len(data))}, data=data, timeout=600), "instagram upload")
+    call("POST", cont.get("uri") or f"https://rupload.facebook.com/ig-api-upload/{ver}/{cid}", "instagram upload",
+         headers={"Authorization": f"OAuth {c['token']}", "offset": "0", "file_size": str(len(data))},
+         data=data, timeout=600, sleep=sleep)
     t0 = time.time()
     while True:  # Instagram processes the video before it can be published
-        st = _check(requests.get(f"{g}/{cid}", params={"fields": "status_code,status",
-                                                        "access_token": c["token"]}, timeout=60),
-                    "instagram status")
-        if st.get("status_code") == "FINISHED":
+        stt = call("GET", f"{g}/{cid}", "instagram status", params={"fields": "status_code,status",
+                                                                     "access_token": c["token"]}, sleep=sleep)
+        if stt.get("status_code") == "FINISHED":
             break
-        if st.get("status_code") in ("ERROR", "EXPIRED") or time.time() - t0 > wait_s:
-            raise RuntimeError(f"instagram processing: {st.get('status_code')} {st.get('status', '')}")
-        time.sleep(10)
-    media = _check(requests.post(f"{g}/{c['ig_id']}/media_publish",
-                                 data={"creation_id": cid, "access_token": c["token"]}, timeout=60),
-                   "instagram publish")
-    link = _check(requests.get(f"{g}/{media['id']}", params={"fields": "permalink",
-                                                             "access_token": c["token"]}, timeout=60),
-                  "instagram permalink")
+        if stt.get("status_code") in ("ERROR", "EXPIRED") or time.time() - t0 > wait_s:
+            raise RuntimeError(f"instagram processing: {stt.get('status_code')} {stt.get('status', '')}")
+        sleep(20)
+    media = call("POST", f"{g}/{c['ig_id']}/media_publish", "instagram publish",
+                 data={"creation_id": cid, "access_token": c["token"]}, sleep=sleep)
+    link = call("GET", f"{g}/{media['id']}", "instagram permalink",
+                params={"fields": "permalink", "access_token": c["token"]}, sleep=sleep)
     return link.get("permalink") or f"instagram media {media['id']}"
 
 
@@ -154,7 +156,11 @@ def _post_facebook(cfg, key, folder, cap, slot):
 def _post_instagram(cfg, key, folder, cap, slot):
     if not meta_creds(cfg, key)["ig_id"]:
         return {"platform": "instagram", "ok": False, "skipped": True,
-                "error": f"instagram.ig_id missing in channels.{key}.crosspost"}
+                "error": f"no Instagram account - link it to the Page and run fb-auth --channel {key}"}
+    from .facebook import video_problems
+    bad = video_problems(folder / "video.mp4")  # same vertical 3-90 s rules work for Reels here
+    if bad:
+        return {"platform": "instagram", "ok": False, "skipped": True, "error": "not posted - " + "; ".join(bad)}
     return {"platform": "instagram", "ok": True,
             "url": post_instagram_reel(cfg, key, folder / "video.mp4", cap["instagram"])}
 
@@ -237,8 +243,6 @@ def validate_crosspost(cfg):
                 problems.append(f"{key}: facebook page_id {pid} is also used by {pages[pid]} - one Page per channel")
             pages[pid] = key
         ig = xp.get("instagram") or {}
-        if ig.get("enabled") and not str(ig.get("ig_id") or "").strip():
-            problems.append(f"{key}: instagram is enabled but ig_id is empty")
         if ig.get("enabled") and not fb.get("page_id"):
             problems.append(f"{key}: instagram needs the facebook page_id (it uses the Page token)")
         tt = xp.get("tiktok") or {}
@@ -274,9 +278,12 @@ def platform_status(cfg, key):
             st = None
             if on:
                 from .facebook import token_status
-                st = token_status(cfg, key)
-                if st.get("ok") and not str(conf.get("ig_id") or ""):
-                    st = {"ok": False, "problem": "ig_id missing"}
+                st = dict(token_status(cfg, key))
+                c = meta_creds(cfg, key)
+                if st.get("ok") and not c["ig_id"]:
+                    st = {"ok": False, "problem": f"no linked Instagram - run fb-auth --channel {key}"}
+                elif st.get("ok"):
+                    st["page_name"] = f"@{c.get('ig_username') or c['ig_id']} (via the Page token)"
         state = "on" if on else "off"
         if st is None:
             detail = "not set up"
