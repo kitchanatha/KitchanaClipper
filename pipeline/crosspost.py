@@ -159,7 +159,17 @@ def _post_instagram(cfg, key, folder, cap, slot):
             "url": post_instagram_reel(cfg, key, folder / "video.mp4", cap["instagram"])}
 
 
+STUDIO_URL = "https://www.tiktok.com/tiktokstudio/upload"
+
+
 def _post_tiktok(cfg, key, folder, cap, slot):
+    mode = ((channel_xp(cfg, key).get("tiktok") or {}).get("mode") or "draft")
+    if mode == "studio":  # you upload on the PC in TikTok Studio - nothing is sent by the API
+        meta = json.loads((folder / "meta.json").read_text(encoding="utf-8"))
+        video = Path(meta["crosspost_pack"]) / "video.mp4" if meta.get("crosspost_pack") else folder / "video.mp4"
+        return {"platform": "tiktok", "ok": True, "draft": True, "url": f"tiktok-studio:{folder.name}",
+                "note": f"upload on the PC: {STUDIO_URL} - file {video} - switch on "
+                        f"'AI-generated content'", "caption": cap["tiktok"] + "\nAI voice"}
     from .tiktok import upload_draft, video_problems
     bad = video_problems(folder / "video.mp4")
     if bad:
@@ -232,10 +242,10 @@ def validate_crosspost(cfg):
         if ig.get("enabled") and not fb.get("page_id"):
             problems.append(f"{key}: instagram needs the facebook page_id (it uses the Page token)")
         tt = xp.get("tiktok") or {}
-        if tt.get("mode", "draft") != "draft":
-            problems.append(f"{key}: tiktok.mode must be draft (direct posting is not set up)")
+        if tt.get("mode", "draft") not in ("draft", "studio"):
+            problems.append(f"{key}: tiktok.mode must be draft or studio (direct posting is not set up)")
         name = str(tt.get("display_name") or "").strip()
-        if tt.get("enabled") and not name:
+        if tt.get("enabled") and tt.get("mode", "draft") == "draft" and not name:
             problems.append(f"{key}: tiktok is enabled without display_name - set it so a wrong account is refused")
         if name:
             if name in tiktoks:

@@ -493,6 +493,13 @@ never touches the YouTube upload. Each platform is posted once per video (`meta.
    `python run.py crosspost last --channel wonder_minute`.
 
 ### TikTok drafts (`pipeline/tiktok.py`, Content Posting API "Upload")
+**`mode: studio` (current choice):** nothing is sent by the API. After Approve the card shows the
+TikTok Studio link (https://www.tiktok.com/tiktokstudio/upload), the video file in the pack folder
+and the caption: drag the file in on the PC, paste the caption, switch on "AI-generated content",
+Post. **`mode: draft`:** the API sends the video to the phone's TikTok inbox (below). Direct posting
+was not built: TikTok requires a per-post privacy / interaction choice UI, private-only posts until
+its app review passes, and the review may refuse a personal tool.
+
 - After Approve, the video is uploaded (chunked FILE_UPLOAD) to the channel's **TikTok inbox as a
   draft**. Discord says "sent to TikTok drafts for <account>" and shows the caption: drafts can't
   carry a caption or an AI label, so paste the caption in TikTok and switch on

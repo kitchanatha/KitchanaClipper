@@ -33,7 +33,8 @@ class ValidateTest(unittest.TestCase):
     def test_bad_values(self):
         cfg = {"channels": {"a": chan(facebook={"enabled": True, "page_id": "", "mode": "now"},
                                       tiktok={"enabled": True, "mode": "direct"},
-                                      instagram={"enabled": True}, youtube_shorts={})}}
+                                      instagram={"enabled": True}, youtube_shorts={}),
+                            "b": chan(tiktok={"enabled": True, "mode": "draft"})}}
         probs = " | ".join(xp.validate_crosspost(cfg))
         for bit in ("page_id is empty", "facebook.mode", "tiktok.mode", "without display_name",
                     "ig_id is empty", "unknown crosspost platform 'youtube_shorts'"):
@@ -89,6 +90,14 @@ class PostPlatformsTest(unittest.TestCase):
         tt = mock.Mock(return_value={"platform": "tiktok", "ok": True, "url": "tiktok-draft:9", "draft": True})
         self.run_with(fb, tt)
         self.assertEqual(xp.failed_platforms(self.meta()), [])
+
+    def test_studio_mode_needs_no_login_and_sends_nothing(self):
+        self.cfg["channels"]["wonder_minute"]["crosspost"]["tiktok"] = {"enabled": True, "mode": "studio"}
+        self.assertEqual(xp.validate_crosspost(self.cfg), [])
+        with mock.patch("pipeline.tiktok.upload_draft") as up:
+            r = xp._post_tiktok(self.cfg, "wonder_minute", self.folder, {"tiktok": "Otters #facts"}, None)
+        up.assert_not_called()
+        self.assertTrue(r["ok"] and "tiktokstudio/upload" in r["note"] and r["caption"].endswith("AI voice"))
 
     def test_switched_off_platform_is_never_called(self):
         self.cfg["channels"]["wonder_minute"]["crosspost"]["tiktok"]["enabled"] = False
