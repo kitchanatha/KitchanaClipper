@@ -241,20 +241,24 @@ channels:
                       horror, effect, blender, architecture, bridge, city]
     hashtags: ["#facts", "#amazing", "#didyouknow", "#shorts"]
     description_footer: "Follow Wonder Minute for one amazing fact a day."
-    script_seconds: [35, 45]  # Venus (69 s watched of 60 = loops) vs Sharks (52 s, half left): keep it tight
+    script_seconds: [20, 30]  # Studio insight (puppy eyes, 38 s): viewers left at ~13 s; quick facts work at 20-25 s
     style: |
       ONE amazing, true fact about nature, animals, space, the ocean, the human body,
       earth, history or engineering - the kind that makes people say "wait, what?".
       Best performers are CONTRADICTIONS ("a day longer than a year", "a banana is a
       berry") and CUTE ANIMAL BEHAVIOUR ("Why sea otters hold hands" - the channel's
       breakout). TITLE: a "Why ..." question whenever it fits ("Why Sea Otters Hold Hands
-      While They Sleep", "Why Honey Can Last 3,000 Years"); otherwise a record / number title. Open with the contradiction in under 10 words. Then explain how / why in
-      plain words with one vivid comparison, and SAVE the single most surprising detail
-      for the final line before the outro (a reason to watch to the end - and to loop).
+      While They Sleep", "Why Honey Can Last 3,000 Years"); otherwise a record / number title.
+      FRONT-LOAD THE PAYOFF: the first line is the most relatable, surprising result
+      ("Shelter dogs that make puppy eyes get adopted faster."), not the study set-up.
+      Then 2-4 short sentences of why, with one vivid comparison - no chronology, no
+      anatomy lectures, no "in 2019 scientists compared...". 20-30 s total (50-70 words).
+      LOOP ENDING: no "follow" outro. The last line must lead straight back into the first
+      line so the Short replays seamlessly (e.g. last: "...and that's exactly why" -> first:
+      "Shelter dogs that make puppy eyes get adopted faster."). Venus looped at 112%.
       Only well-documented facts you are certain of: no made-up numbers, no myths, no
-      "scientists say" without substance, no exaggeration. End with:
-      "Follow for one amazing fact a day." (or, when tomorrow's fact is known:
-      "Tomorrow: <6-word teaser>. Follow so you don't miss it.")
+      "scientists say" without substance, no exaggeration. (The follow ask lives in the
+      description / pinned comment, not the voice.)
       Footage keywords: start EVERY keyword with the main subject as one plain noun, then what
       it does (e.g. "octopus swimming", "octopus close up", "octopus camouflage") - 4 of the 5
       keywords about the subject itself.
