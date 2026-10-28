@@ -183,7 +183,7 @@ channels:
     crosspost:              # opt-in per platform; posted only after your Approve in Discord
       facebook: {enabled: false, page_id: "", mode: publish}   # publish | schedule (= YouTube slot)
       instagram: {enabled: false, ig_id: ""}                   # uses the Facebook Page token
-      tiktok: {enabled: false, mode: draft}                    # draft = TikTok inbox, you tap Post
+      tiktok: {enabled: false, mode: draft, display_name: ""}  # draft = TikTok inbox, you tap Post
       caption_style: short
     enabled: true
     daily_count: 1
@@ -226,7 +226,7 @@ channels:
     crosspost:              # opt-in per platform; posted only after your Approve in Discord
       facebook: {enabled: true, page_id: "1362008497000440", mode: publish}   # publish | schedule (= YouTube slot)
       instagram: {enabled: false, ig_id: ""}                   # uses the Facebook Page token
-      tiktok: {enabled: false, mode: draft}                    # draft = TikTok inbox, you tap Post
+      tiktok: {enabled: false, mode: draft, display_name: ""}  # draft = TikTok inbox, you tap Post
       caption_style: short
     enabled: true
     daily_count: 2
@@ -359,7 +359,7 @@ channels:
     crosspost:              # opt-in per platform; posted only after your Approve in Discord
       facebook: {enabled: true, page_id: "1384662268056735", mode: publish}   # publish | schedule (= YouTube slot)
       instagram: {enabled: false, ig_id: ""}                   # uses the Facebook Page token
-      tiktok: {enabled: false, mode: draft}                    # draft = TikTok inbox, you tap Post
+      tiktok: {enabled: false, mode: draft, display_name: ""}  # draft = TikTok inbox, you tap Post
       caption_style: short
     daily_count: 1          # one Short a day from the topic finder - only topics you pick + approve
     footage_hint: rain on window, water surface, phone screen scrolling, documents on desk, weather radar map, abstract data

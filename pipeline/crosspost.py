@@ -157,12 +157,27 @@ def _post_instagram(cfg, key, folder, cap, slot):
             "url": post_instagram_reel(cfg, key, folder / "video.mp4", cap["instagram"])}
 
 
-POSTERS = {"facebook": _post_facebook, "instagram": _post_instagram}
+def _post_tiktok(cfg, key, folder, cap, slot):
+    from .tiktok import upload_draft, video_problems
+    bad = video_problems(folder / "video.mp4")
+    if bad:
+        return {"platform": "tiktok", "ok": False, "skipped": True, "error": "not sent - " + "; ".join(bad)}
+    pid, who = upload_draft(cfg, key, folder / "video.mp4")
+    caption = cap["tiktok"] + "\nAI voice"  # drafts can't carry a caption: you paste this one
+    return {"platform": "tiktok", "ok": True, "url": f"tiktok-draft:{pid}", "draft": True,
+            "note": f"sent to TikTok drafts for {who} - open TikTok > Inbox to finish posting "
+                    f"(switch on 'AI-generated content')", "caption": caption}
+
+
+POSTERS = {"facebook": _post_facebook, "instagram": _post_instagram, "tiktok": _post_tiktok}
 ICONS = {"facebook": "📘", "instagram": "📸", "tiktok": "🎵"}
 
 
 def result_line(r):
     name = r["platform"].title()
+    if r.get("ok") and r.get("draft"):
+        cap = f"\nCaption to paste:\n```\n{r['caption']}\n```" if r.get("caption") else ""
+        return f"{ICONS.get(r['platform'], '')} {name} 📥 {r.get('note', 'draft sent')}{cap}"
     if r.get("ok"):
         return f"{ICONS.get(r['platform'], '')} {name} ✅ {r.get('url', '')} {('(' + r['note'] + ')') if r.get('note') else ''}".strip()
     return f"{ICONS.get(r['platform'], '')} {name} ❌ {r.get('error', '')[:300]}"

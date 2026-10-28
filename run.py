@@ -12,6 +12,7 @@
   python run.py report                                          last-7-day stats -> data/weekly_stats.csv
   python run.py auth-analytics --channel summed_up              optional: avg % viewed in the report
   python run.py fb-auth --channel wonder_minute                 connect the channel's Facebook Page (once)
+  python run.py tiktok-auth --channel wonder_minute             connect the channel's TikTok account (once)
   python run.py crosspost last --channel wonder_minute [--force] post an uploaded video to Facebook etc.
 
 Story mode (Candlelit Tales, README section 7):
@@ -382,7 +383,7 @@ def main():
     ap.add_argument("command", choices=["generate", "daily", "review", "upload", "auth", "test-video",
                                         "story-check", "story-prep", "story-build", "fonts",
                                         "news-research", "news-show", "news-approve", "news-build",
-                                        "ideas", "report", "auth-analytics", "fb-auth", "crosspost"])
+                                        "ideas", "report", "auth-analytics", "fb-auth", "tiktok-auth", "crosspost"])
     ap.add_argument("slug", nargs="?", help="story folder name (story-* commands)")
     ap.add_argument("--lang", help="story languages, e.g. en or en,th,zh (default: all in config)")
     ap.add_argument("--yes", action="store_true", help="story-build: don't ask before paying for audio")
@@ -443,6 +444,11 @@ def main():
             sys.exit("Use --channel, e.g. python run.py fb-auth --channel wonder_minute")
         from pipeline.facebook import auth as fb_auth
         fb_auth(cfg, a.channel)
+    elif a.command == "tiktok-auth":
+        if not a.channel:
+            sys.exit("Use --channel, e.g. python run.py tiktok-auth --channel wonder_minute")
+        from pipeline.tiktok import auth as tt_auth
+        tt_auth(cfg, a.channel)
     elif a.command == "crosspost":
         if not a.channel:
             sys.exit("Use --channel, e.g. python run.py crosspost last --channel wonder_minute")

@@ -480,9 +480,29 @@ never touches the YouTube upload. Each platform is posted once per video (`meta.
 6. Set `enabled: true`. Test with an old video: `/crosspost` in Discord (channel, `last`) or
    `python run.py crosspost last --channel wonder_minute`.
 
-### TikTok drafts
-Coming in phase 3 (Content Posting API "Upload": the video lands in the account's TikTok inbox,
-you open TikTok and tap Post).
+### TikTok drafts (`pipeline/tiktok.py`, Content Posting API "Upload")
+- After Approve, the video is uploaded (chunked FILE_UPLOAD) to the channel's **TikTok inbox as a
+  draft**. Discord says "sent to TikTok drafts for <account>" and shows the caption: drafts can't
+  carry a caption or an AI label, so paste the caption in TikTok and switch on
+  **"AI-generated content"** before you tap Post.
+- Checked before sending: the token is for this channel and the same TikTok account (and
+  `display_name` from config if you set it), max 5 drafts per account per 24 h (TikTok's limit),
+  MP4/H.264, 23-60 fps, <= 10 min. Rate limits / server errors are retried max 3 times.
+- Login: `python run.py tiktok-auth --channel <key>` opens TikTok in your browser; you log in with
+  that channel's account yourself (PKCE, redirect to `127.0.0.1:8766`). The token renews itself
+  (access 24 h, refresh 365 days) and is saved to `tokens/tiktok_<key>.json`.
+
+**One-time setup (developers.tiktok.com - you do these):**
+1. Create an app (type **Other**), name KitchanaClipper, platform **Desktop**, Web/Desktop URL,
+   Terms and Privacy URLs on the GitHub Pages site (`docs/`), verified via **URL properties ->
+   URL prefix** with the signature file in `docs/`.
+2. Products: **Login Kit** (Desktop redirect URI `http://127.0.0.1:*/tiktok-callback`) and
+   **Content Posting API** (Upload on, Direct Post off). Scopes: `user.info.basic`, `video.upload`.
+3. **Sandbox** (clone Production) -> **Target users**: add each channel's TikTok account (log in
+   yourself). Sandbox **Credentials** -> `.env`: `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`.
+4. Sandbox works without review for those target accounts. For production: record a demo video
+   of the full flow in sandbox, then **Submit for review** (the scopes must be approved for
+   `video.upload`); switch `.env` to the production keys afterwards and run tiktok-auth again.
 
 ## Files
 

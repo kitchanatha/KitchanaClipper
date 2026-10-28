@@ -1,0 +1,20 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1024
+PlayResY: 1024
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Draw,Anton,20,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
+Style: Big,Anton,330,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,6,0,1,0,0,5,0,0,0,1
+Style: Small,Anton,96,&H00B5E83E,&H00B5E83E,&H00000000,&H00000000,0,0,0,0,100,100,14,0,1,0,0,5,0,0,0,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:05.00,Draw,,0,0,0,,{\pos(0,0)\p1\1c&H00B5E83E&}m 160 120 l 864 120 b 920 120 944 144 944 200 l 944 300 l 80 300 l 80 200 b 80 144 104 120 160 120{\p0}
+Dialogue: 1,0:00:00.00,0:00:05.00,Draw,,0,0,0,,{\pos(0,0)\p1\1c&H00151110&}m 150 140 l 230 140 l 190 280 l 110 280 m 330 140 l 410 140 l 370 280 l 290 280 m 510 140 l 590 140 l 550 280 l 470 280 m 690 140 l 770 140 l 730 280 l 650 280 m 870 140 l 930 140 l 910 280 l 830 280{\p0}
+Dialogue: 0,0:00:00.00,0:00:05.00,Draw,,0,0,0,,{\pos(0,0)\p1\1c&H00352C26&}m 80 330 l 944 330 l 944 830 b 944 886 920 910 864 910 l 160 910 b 104 910 80 886 80 830{\p0}
+Dialogue: 2,0:00:00.00,0:00:05.00,Draw,,0,0,0,,{\pos(0,0)\p1\1c&H00B5E83E&}m 420 470 l 420 700 l 620 585{\p0}
+Dialogue: 2,0:00:00.00,0:00:05.00,Small,,0,0,0,,{\pos(512,820)}CLIPPER
