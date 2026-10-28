@@ -120,7 +120,9 @@ def post_instagram_reel(cfg, key, video, caption, wait_s=300, sleep=time.sleep):
     ver = graph_version(cfg)
     g = f"https://graph.facebook.com/{ver}"
     cont = call("POST", f"{g}/{c['ig_id']}/media", "instagram container", data={
-        "media_type": "REELS", "upload_type": "resumable", "caption": caption, "share_to_feed": "true",
+        # no share_to_feed: with upload_type=resumable it makes the upload fail (ProcessingFailedError,
+        # tested Oct 2026); Reels show in the feed by default anyway
+        "media_type": "REELS", "upload_type": "resumable", "caption": caption,
         "is_ai_generated": "true", "access_token": c["token"]}, sleep=sleep)
     cid = cont["id"]
     data = Path(video).read_bytes()
