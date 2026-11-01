@@ -117,9 +117,16 @@ def generate_one(cfg, key, script_file=None, script=None, folder=None, extra_met
         print(f"[{ch['name']}] building video...")
         total = build_video(cfg, ch, clips, folder / "voice.mp3", words, work, folder / "video.mp4",
                             hook=s.get("hook_text") if ch.get("hook_card") else None)
+        gfx_skipped = []
+        if ch.get("graphics") and s.get("graphics"):  # fact graphics (maps, timelines...) - pipeline/factgfx.py
+            from pipeline.factgfx import apply_graphics
+            print(f"[{ch['name']}] drawing {len(s['graphics'])} graphic(s)...")
+            gfx_skipped = apply_graphics(cfg, s["graphics"], words, folder / "video.mp4", work)
+            for g in gfx_skipped:
+                print(f"[{ch['name']}]   graphic skipped: {g}")
         meta = {**s, "channel": key, "channel_name": ch["name"], "length_sec": round(total, 1),
                 "created": datetime.now().isoformat(timespec="seconds"), "pexels_ids": ids,
-                **(extra_meta or {})}
+                **({"graphics_skipped": gfx_skipped} if gfx_skipped else {}), **(extra_meta or {})}
         (folder / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
         (folder / "script.txt").write_text(s["title"] + "\n\n" + s["script"] + "\n", encoding="utf-8")
         h["topics"].append(s.get("topic") or s["title"])

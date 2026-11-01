@@ -5,12 +5,14 @@ Uses Pexels when PEXELS_API_KEY is set, otherwise Pixabay (PIXABAY_API_KEY).
 import os
 import random
 import re
+import time
 from pathlib import Path
 
 import requests
 
 from .common import env
 
+CLIP_DEADLINE_S = 90  # one stock clip may take at most this long to download, then it's skipped
 PEXELS_SEARCH = "https://api.pexels.com/videos/search"
 PIXABAY_SEARCH = "https://pixabay.com/api/videos/"
 
@@ -184,11 +186,16 @@ def get_footage(keywords, extra_hint, needed_seconds, clip_seconds, folder, used
             p = folder / f"{name}.mp4"
             seen.add(hid)
             try:  # a stalled or broken download skips that clip instead of failing the video
+                started = time.time()
                 with requests.get(link, stream=True, timeout=(15, 60)) as d:
                     d.raise_for_status()
                     with open(p, "wb") as f:
-                        for chunk in d.iter_content(1 << 20):
+                        for chunk in d.iter_content(64 << 10):
                             f.write(chunk)
+                            # the read timeout resets on every trickle of bytes: a server dripping
+                            # data kept a build waiting 10+ minutes - give each clip 90 s in total
+                            if time.time() - started > CLIP_DEADLINE_S:
+                                raise requests.Timeout(f"slower than {CLIP_DEADLINE_S} s")
             except requests.RequestException as e:
                 print(f"  skipped a clip that failed to download ({type(e).__name__})")
                 p.unlink(missing_ok=True)

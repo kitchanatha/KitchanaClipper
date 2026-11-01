@@ -440,7 +440,16 @@ Pro plan instead of the Anthropic API. The Claude app must be open on this PC.
 - **สรุปให้ฟัง**: Shorts 45-55 s (people left at 20-30 s), key number first; long recaps only for big
   stories; new long thumbnail = 2 lines of huge text + the key number in a big yellow box over a
   blurred frame of the video.
-- **Storytime Cuts**: 3-part horror-mystery series (a new chilling clue at ~20 s, a terrifying twist in
+- **Fact graphics (Wonder Minute, true Storytime stories)**: each script carries a `graphics` list
+  (map + pin, "years ago" timeline, deep-ocean depth gauge, bars, ratio dots, big-number stat),
+  anchored to phrases in the narration and drawn over the video by `pipeline/factgfx.py`
+  (format: `SPEC_HELP` in that file). A graphic whose phrase isn't spoken is skipped and listed in
+  meta.json `graphics_skipped`; the video is never lost. World outline: Natural Earth 1:110m
+  (public domain), `data/geo/land-110m.json`.
+- **Storytime Cuts (Nov 2026)**: 3-part series alternating TRUE stories (researched, 2+ sources,
+  documentary style, sources in the description, map / timeline graphics) and FICTION (terrifying
+  twist). Themes: unexplained and eerie, human cruelty and cover-ups, nature at its worst.
+  Before Nov 2026: 3-part horror-mystery series (a new chilling clue at ~20 s, a terrifying twist in
   the final part, no gore), one part a night, Full Story built with Part 3 - approve it a week later.
   The series state is `data/storytime_series.json`.
 

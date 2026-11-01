@@ -81,6 +81,25 @@ news:                       # Thai news recaps (สรุปให้ฟัง) 
     pptvhd36.com: PPTV
     reuters.com: Reuters
     apnews.com: AP
+    # international outlets + official government pages, for foreign stories (added Oct 2026)
+    bbc.com: BBC
+    bbc.co.uk: BBC                      # same newsroom - counts as one outlet
+    theguardian.com: The Guardian
+    nhk.or.jp: NHK
+    japantimes.co.jp: The Japan Times
+    english.kyodonews.net: Kyodo
+    euronews.com: Euronews
+    dw.com: DW
+    france24.com: France 24
+    gov.uk: UK Government
+    msb.se: Sweden MSB (civil contingencies agency)
+    mcf.se: Sweden MSB (civil contingencies agency)   # MSB's new name / site - same agency
+    nippon.com: Nippon.com
+    dsb.no: Norway DSB (civil protection directorate)
+    72tuntia.fi: Finland 72 hours (official preparedness)
+    bousai.go.jp: Japan Cabinet Office (disaster management)
+    commission.europa.eu: European Commission
+    ec.europa.eu: European Commission  # same institution - counts as one
 
 social:                     # Facebook + Instagram captions for every video (Discord card buttons)
   enabled: true
@@ -197,23 +216,31 @@ channels:
                       religious, prayer, quran, bible, mosque, church, painting, artwork, art, museum,
                       flag, flags, blood, gore, zombie, skull, skeleton, mask, clown, halloween,
                       costume, demon, monster, weapon, knife, gun, corpse]
-    hashtags: ["#scarystories", "#creepy", "#storytime", "#shorts"]
-    description_footer: "This is a fictional story. Follow Storytime Cuts for the next part."
+    hashtags: ["#truestory", "#scarystories", "#storytime", "#shorts"]
+    description_footer: "Follow Storytime Cuts for the next part."
     series: 3                 # every story is a 3-part series (+ a Full Story a week later)
+    graphics: true            # true stories: map pin + "when" timeline (pipeline/factgfx.py); fiction: none
     style: |
-      ONE PART of an ORIGINAL 3-part fictional horror-mystery series, told in first person,
-      in a real-feeling everyday setting (apartment, night shift, elevator, voicemail,
-      smart speaker, parcel locker, babysitting monitor...). Something strange KEEPS
-      HAPPENING ("every night...", "every morning...").
-      The FIRST sentence is the hook: 5-10 words, spoken in under 2 seconds, an unsettling
-      open question (e.g. "My smart speaker answers questions I never ask."). NO
-      scene-setting before it. Around 20 seconds in, a NEW chilling clue (people leave at
-      ~25 s - give them a reason to stay). Parts 1 and 2 end on a cliffhanger + "Follow for
-      part 2." / "Follow for the final part."; the final part ends on a TERRIFYING TWIST
-      that recontextualises everything (the narrator was wrong about who / what / when) +
-      "Follow for more stories." Creepy through implication and dread, NOT gore: no blood,
-      no graphic violence, no self-harm, no harm to children or animals, no real people or
-      places.
+      ONE PART of a 3-part series. Series ALTERNATE between two kinds (data/storytime_series.json
+      "kind"): a TRUE STORY, then an original FICTION story, then true again...
+      Themes for both: the unexplained and eerie (vanished crews, impossible deaths, ghost ships),
+      human cruelty and cover-ups (disasters caused by greed, negligence or secrecy), and nature at
+      its worst (avalanches, volcanoes, freak waves, survival against impossible odds).
+      TRUE STORY: a real, well-documented tragedy, accident or mystery, ideally 20+ years old.
+      Every fact from 2+ credible sources (encyclopaedias, major outlets, official reports) - the
+      sources go in the description. Narrated as a documentary (third person), never invented
+      dialogue or details; disputed points are said to be disputed ("investigators believe...").
+      Respectful to the victims: no gore or graphic injury, no naming private victims or their
+      families, never mocking. Graphics: a map pin for where and a timeline for when.
+      FICTION: an original first-person story in a real-feeling everyday setting where something
+      keeps happening; ends on a terrifying twist. No real people or real places.
+      Both: the FIRST sentence is the hook (5-10 words, under 2 seconds, an unsettling open
+      question, e.g. "In 1959, nine hikers fled their tent in the dark."). No scene-setting before
+      it. Around 20 seconds in, a NEW chilling detail. Parts 1 and 2 end on a cliffhanger +
+      "Follow for part 2." / "Follow for the final part."; the final part ends on the reveal +
+      "Follow for more stories." Creepy through facts and dread, NOT gore: no blood, no
+      graphic violence, no self-harm, no harm to children or animals shown. Descriptions say
+      "True story. Sources: ..." or "This is a fictional story."
 
   wonder_minute_th:           # Thai versions of Wonder Minute facts, for TikTok only (no YouTube,
     name: Wonder Minute ไทย    # not in the daily run). Built on request into output/tiktok_th/.
@@ -253,6 +280,8 @@ channels:
     enabled: true
     daily_count: 2
     publish_times: ["12:00", "20:30"]   # 8.5 h apart (min_gap_hours)
+    graphics: true            # every script carries a "graphics" list (maps, timelines, depth gauge, stats...)
+                              # drawn over the video - format in pipeline/factgfx.py SPEC_HELP
     hook_options: true        # 3 spoken first lines (5-10 words, under 2 s), Claude picks the strongest
     footage_hint: ocean, deep sea, space, galaxy, volcano, jungle, wild animals, microscope, aurora
     clips_per_keyword: 6      # mostly footage of the video's subject; the hint above is only backup
@@ -287,6 +316,9 @@ channels:
       Only well-documented facts you are certain of: no made-up numbers, no myths, no
       "scientists say" without substance, no exaggeration. (The follow ask lives in the
       description / pinned comment, not the voice.)
+      GRAPHICS: add 1-3 overlays in "graphics" that SHOW the fact - where it is (map + pin),
+      when (timeline for "years ago"), how deep / how big / how many (depth, bars, ratio,
+      stat). Anchor each one to a phrase spoken word for word in the script.
       Footage keywords: start EVERY keyword with the main subject as one plain noun, then what
       it does (e.g. "octopus swimming", "octopus close up", "octopus camouflage") - 4 of the 5
       keywords about the subject itself.
