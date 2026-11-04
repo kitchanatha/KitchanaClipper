@@ -415,6 +415,7 @@ def main():
     ap.add_argument("--title", help="clip-short / clip-compile: video title")
     ap.add_argument("--hook", help="clip-short: big headline for the first seconds")
     ap.add_argument("--clips", help="clip-compile: clip ids, comma-separated, in order")
+    ap.add_argument("--full-frame", action="store_true", help="clip-short: keep the whole 16:9 frame (e.g. a corner facecam)")
     a = ap.parse_args()
     cfg = load_config()
     if a.command.startswith("clip-"):
@@ -435,7 +436,7 @@ def main():
                 if not (a.slug and a.title):
                     sys.exit('Usage: python run.py clip-short <clip id> --title "..." [--start S --end S --hook "..."]')
                 check_ffmpeg()
-                clipper.short(cfg, key, a.slug, a.start, a.end, a.title, a.hook)
+                clipper.short(cfg, key, a.slug, a.start, a.end, a.title, a.hook, gameplay_height=608 if a.full_frame else None)
             elif a.command == "clip-compile":
                 if not (a.clips and a.title):
                     sys.exit('Usage: python run.py clip-compile --clips id1,id2,id3 --title "..."')

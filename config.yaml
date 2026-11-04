@@ -391,7 +391,12 @@ channels:
     description_footer: "Fan-made highlights, not affiliated with or endorsed by NCSOFT. AION 2 is a trademark of NCSOFT. Clips are used with each creator's permission - creators can ask for removal any time."
     # ONLY these creators' clips can be added. Add someone only AFTER they say yes, with the date, how
     # they agreed and a saved proof (permissions/). Shortlist + message template: permissions/aion2_streamers.md
-    creators: []
+    creators:
+      - name: SpidMMO
+        platform: twitch
+        channel: spidmmo
+        url: https://www.twitch.tv/spidmmo
+        permission: {date: "2026-11-04", how: "email reply from contact@spidmmo.com (Jawad Raja)", proof: "permissions/spidmmo.txt", notes: "no extra rules"}
     #  - name: Stoopzz
     #    platform: twitch            # twitch | youtube | kick
     #    channel: stoopzz            # twitch login / youtube @handle / kick slug

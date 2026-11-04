@@ -236,7 +236,7 @@ def _write_review(cfg, key, slug, meta, script_text, build):
     return out_dir
 
 
-def short(cfg, key, cid, start, end, title, hook=None, log=print):
+def short(cfg, key, cid, start, end, title, hook=None, log=print, gameplay_height=None):
     """A vertical highlight Short from one clip (start/end in seconds within the clip)."""
     ch = cfg["channels"][key]
     rec = get_clip(key, cid)
@@ -255,7 +255,7 @@ def short(cfg, key, cid, start, end, title, hook=None, log=print):
 
     def build(work, out_mp4):
         short_ass(work / "short.ass", ch, rec, hook, total)
-        fg_h = int(ch.get("short_gameplay_height", 760)) // 2 * 2   # 608 = whole 16:9 frame; more = sides trimmed
+        fg_h = int(gameplay_height or ch.get("short_gameplay_height", 760)) // 2 * 2  # 608 = whole frame (keeps a corner facecam)
         vf = (f"[0:v]split=2[a][b];"
               f"[a]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=20:2,eq=brightness=-0.25[bg];"
               f"[b]scale=1080:{fg_h}:force_original_aspect_ratio=increase,crop=1080:{fg_h}[fg];"
