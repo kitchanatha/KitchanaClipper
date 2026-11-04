@@ -348,6 +348,10 @@ async def on_interaction(inter: discord.Interaction):
             url, slot = await asyncio.to_thread(core.upload_one, cfg, key, dest)
             warn = "".join(f"\n⚠️ {w}" for w in uploaded_meta(key, dest.name).get("upload_warnings", []))
             save_card_header(key, dest.name, f"{note}\n▶️ YouTube ✅ {url}\n{upload_note(slot)}{warn}")
+            pin = uploaded_meta(key, dest.name).get("pin_comment")
+            if pin:  # YouTube's API can't pin comments - paste this one and pin it
+                await say(f"📌 Comment to paste + pin under **{uploaded_meta(key, dest.name).get('title', '')}** "
+                          f"({url}):\n```\n{pin[:1700]}\n```")
             from pipeline.crosspost import failed_platforms
             keep = CaptionView(key, dest.name, failed_platforms(uploaded_meta(key, dest.name)))
             return await msg.edit(view=keep, content=card_text(key, dest.name))
@@ -463,7 +467,8 @@ async def daily_loop():
     await say(f"**{MACHINE}** online. Daily run at {state['daily_time']}"
               f"{' (PAUSED)' if state['paused'] else ''}.\n{schedule_text()}")
     from pipeline.crosspost import validate_crosspost
-    probs = validate_crosspost(cfg)
+    from pipeline.links import validate_links
+    probs = validate_crosspost(cfg) + validate_links(cfg)
     if probs:  # config mistakes that could post to the wrong account or never post
         await say("⚠️ Cross-post config:\n" + "\n".join(f"• {p}" for p in probs))
     await post_panel()
@@ -1372,6 +1377,30 @@ async def platforms_cmd(inter: discord.Interaction, channel: app_commands.Choice
         lines = await asyncio.to_thread(platform_status, cfg, channel.value)
         probs = [p for p in validate_crosspost(cfg) if p.startswith(channel.value + ":")]
         text = f"**{channel.name} - platforms**\n" + "\n".join(lines)
+        if probs:
+            text += "\n⚠️ " + "\n⚠️ ".join(probs)
+        await i.followup.send(text[:1990])
+    await guarded(inter, go)
+
+
+LINK_CHOICES = [app_commands.Choice(name=cfg["channels"][k]["name"], value=k)
+                for k in REVIEW_KEYS if cfg["channels"][k].get("links") is not None][:25]
+
+
+@bot.tree.command(name="links", description="A channel's cross-platform links, and whether each one still works")
+@app_commands.choices(channel=LINK_CHOICES)
+async def links_cmd(inter: discord.Interaction, channel: app_commands.Choice[str]):
+    from pipeline.links import follow_block, link_report, shorts_line, validate_links
+
+    async def go(i):
+        await i.response.defer()
+        lines = await asyncio.to_thread(link_report, cfg, channel.value)
+        probs = [p for p in validate_links(cfg) if p.startswith(channel.value + ":")]
+        text = f"**{channel.name} - links**\n" + "\n".join(lines)
+        block = follow_block(cfg, channel.value)
+        text += (f"\n\nLong-video description ends with:\n```\n{block}\n```" if block else
+                 "\n\nNo links set yet - long videos get no Follow block.")
+        text += f"\nShorts get the line: `{shorts_line(cfg, channel.value)}`"
         if probs:
             text += "\n⚠️ " + "\n⚠️ ".join(probs)
         await i.followup.send(text[:1990])

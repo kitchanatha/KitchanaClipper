@@ -61,7 +61,30 @@ def captions(cfg, key, meta):
             tt += " " + t
     if src:  # news: TikTok gets the outlets too (short form)
         tt = (tt + "\n" + "แหล่งข่าว: " + ", ".join(_outlets(cfg, meta)))[:TIKTOK_MAX + 80]
+    # back to YouTube: URL on Facebook; text only where captions aren't clickable
+    from .links import back_to_youtube
+    long_url, long_sec = _long_version(cfg, key, meta)
+    fb_line = back_to_youtube(cfg, key, meta, True, long_url, long_sec)
+    txt_line = back_to_youtube(cfg, key, meta, False, long_url, long_sec)
+    fb = fb.strip() + ("" if txt_line in fb else "\n\n" + fb_line)
+    ig = ig.strip() + ("" if txt_line in ig else "\n\n" + txt_line)
+    tt = tt.strip() + ("" if txt_line in tt else "\n" + txt_line)
     return {"facebook": fb.strip(), "instagram": ig.strip(), "tiktok": tt.strip()}
+
+
+def _long_version(cfg, key, meta):
+    """(url, seconds) of the long YouTube version of this video, if one is up."""
+    if meta.get("kind") == "story" or meta.get("variant") == "long":
+        return (f"https://youtu.be/{meta['video_id']}" if meta.get("video_id") else None), meta.get("length_sec")
+    if meta.get("kind") == "news":
+        from .youtube import _news_sibling
+        try:
+            sib = _news_sibling(cfg, key, meta, {"long"})
+        except (KeyError, OSError):
+            sib = None
+        if sib:
+            return f"https://youtu.be/{sib[1]['video_id']}", sib[1].get("length_sec")
+    return None, None
 
 
 def make_pack(cfg, key, folder, youtube_url=None):

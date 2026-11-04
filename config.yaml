@@ -177,6 +177,11 @@ channels:
     caption_color: "#F2C14E"
     highlight_color: "#FFFFFF"
     youtube_token: tokens/mindset_minute.json
+    links:                  # cross-platform links (README 14) - fill in; empty ones are left out
+      youtube: ""
+      facebook: ""
+      tiktok: ""
+      sister_channels: []   # [{name: "...", url: "https://..."}]
     enabled: false          # paused (files kept): skipped by the daily run and the bot; /channel-enable
     daily_count: 1
     publish_times: ["12:00"]
@@ -199,6 +204,12 @@ channels:
     caption_color: "#F5E9FF"
     highlight_color: "#FFB86B"
     youtube_token: tokens/storytime_cuts.json
+    links:                  # cross-platform links (README 14) - fill in; empty ones are left out
+      youtube: ""
+      facebook: ""
+      tiktok: ""
+      sister_channels: []   # [{name: "...", url: "https://..."}]
+      shorts_line: "Full story on our channel: Storytime Cuts"
     crosspost:              # opt-in per platform; posted only after your Approve in Discord
       facebook: {enabled: false, page_id: "", mode: publish}   # publish | schedule (= YouTube slot)
       instagram: {enabled: false, ig_id: ""}                   # uses the Facebook Page token
@@ -272,6 +283,12 @@ channels:
     caption_color: "#FFFFFF"
     highlight_color: "#3DDCFF"
     youtube_token: tokens/wonder_minute.json
+    links:                  # cross-platform links (README 14) - fill in; empty ones are left out
+      youtube: ""
+      facebook: ""
+      tiktok: ""
+      sister_channels: []   # [{name: "...", url: "https://..."}]
+      shorts_line: "More amazing facts on our channel: Wonder Minute"   # no long versions, so not "full version"
     crosspost:              # opt-in per platform; posted only after your Approve in Discord
       facebook: {enabled: true, page_id: "1362008497000440", mode: publish}   # publish | schedule (= YouTube slot)
       instagram: {enabled: true, ig_id: ""}                     # uses the Facebook Page token
@@ -341,6 +358,11 @@ channels:
     highlight_color: "#3EE8B5"
     bg_color: "#0F1115"
     youtube_token: tokens/prompt_minute.json
+    links:                  # cross-platform links (README 14) - fill in; empty ones are left out
+      youtube: ""
+      facebook: ""
+      tiktok: ""
+      sister_channels: []   # [{name: "...", url: "https://..."}]
     publish_times: ["19:00"]
     hashtags: ["#ai", "#aitips", "#prompts", "#shorts"]
     description_footer: "Follow Prompt Minute for one AI trick a day. Demos recorded in incognito chats with made-up details."
@@ -358,6 +380,11 @@ channels:
     caption_color: "#F3E6C8"              # text
     highlight_color: "#F2A541"            # accent
     youtube_token: tokens/candlelit_en.json
+    links:                  # cross-platform links (README 14) - fill in; empty ones are left out
+      youtube: ""
+      facebook: ""
+      tiktok: ""
+      sister_channels: []   # [{name: "...", url: "https://..."}]
     daily_count: 0          # manual only (story mode)
     footage_hint: candlelight, foggy forest, old house at night, moonlit clouds, fireplace
     hashtags: ["#story", "#audiobook", "#classicstories", "#bedtimestories"]
@@ -374,6 +401,11 @@ channels:
     caption_color: "#F3E6C8"
     highlight_color: "#F2A541"
     youtube_token: tokens/candlelit_th.json
+    links:                  # cross-platform links (README 14) - fill in; empty ones are left out
+      youtube: ""
+      facebook: ""
+      tiktok: ""
+      sister_channels: []   # [{name: "...", url: "https://..."}]
     daily_count: 0
     footage_hint: candlelight, foggy forest, old house at night, moonlit clouds, fireplace
     hashtags: ["#นิทาน", "#เรื่องเล่า", "#หนังสือเสียง", "#เรื่องสั้น"]
@@ -390,6 +422,11 @@ channels:
     caption_color: "#F3E6C8"
     highlight_color: "#F2A541"
     youtube_token: tokens/candlelit_zh.json
+    links:                  # cross-platform links (README 14) - fill in; empty ones are left out
+      youtube: ""
+      facebook: ""
+      tiktok: ""
+      sister_channels: []   # [{name: "...", url: "https://..."}]
     daily_count: 0
     footage_hint: candlelight, foggy forest, old house at night, moonlit clouds, fireplace
     hashtags: ["#故事", "#有声书", "#经典故事", "#睡前故事"]
@@ -410,6 +447,11 @@ channels:
     highlight_color: "#FFD60A"            # accent: date pills, dots, current caption word
     latest_color: "#E63946"               # the "ล่าสุด" (latest) dot and pill
     youtube_token: tokens/summed_up.json
+    links:                  # cross-platform links (README 14) - fill in; empty ones are left out
+      youtube: ""
+      facebook: ""
+      tiktok: ""
+      sister_channels: []   # [{name: "...", url: "https://..."}]
     crosspost:              # opt-in per platform; posted only after your Approve in Discord
       facebook: {enabled: true, page_id: "1384662268056735", mode: publish}   # publish | schedule (= YouTube slot)
       instagram: {enabled: false, ig_id: ""}                   # uses the Facebook Page token

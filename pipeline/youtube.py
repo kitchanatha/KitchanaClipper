@@ -122,6 +122,8 @@ def upload(cfg, key, ch, folder):
         desc = "\n\n".join(x for x in [meta.get("description", ""), ch.get("description_footer", ""),
                                        " ".join(tags)] if x)
         category = cfg["youtube"]["category_id"]
+    from .links import is_long, pinned_comment, with_links
+    desc = with_links(cfg, key, meta, desc)  # long: "Follow us" block last; Shorts: plain-text line
     body = {
         "snippet": {
             "title": meta["title"][:100],
@@ -163,6 +165,8 @@ def upload(cfg, key, ch, folder):
             warnings.append("YouTube's API can't pin comments or set a Short's related video. In Studio, "
                             f"open the Short -> Related video -> pick the long recap (https://youtu.be/{long_id}), "
                             f"and pin this comment under the Short: {meta['pinned_comment']}")
+    if is_long(meta):  # the API can't pin comments: the text goes to Discord to paste + pin
+        meta["pin_comment"] = pinned_comment(cfg, key, meta)
     # the video is up - report problems, don't fail (a retry would upload it twice)
     meta["upload_warnings"] = warnings
     (folder / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2),

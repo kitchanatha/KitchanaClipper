@@ -550,6 +550,34 @@ its app review passes, and the review may refuse a personal tool.
    of the full flow in sandbox, then **Submit for review** (the scopes must be approved for
    `video.upload`); switch `.env` to the production keys afterwards and run tiktok-auth again.
 
+## 14. Cross-platform links (grow the audience between platforms)
+
+Fill in `config.yaml` → `channels.<key>.links` yourself (empty ones are simply left out):
+
+```yaml
+links:
+  youtube: "https://www.youtube.com/@..."
+  facebook: "https://www.facebook.com/..."
+  tiktok: "https://www.tiktok.com/@..."
+  sister_channels: [{name: "Wonder Minute", url: "https://www.youtube.com/@..."}]
+  shorts_line: "..."        # optional - the plain-text line in Shorts descriptions
+  pinned_question: "..."    # optional - opens the pinned comment
+```
+
+Added at **upload time**, so videos already waiting for review get them too (`pipeline/links.py`):
+
+| Where | What |
+|---|---|
+| Long videos (stories, news long recaps) | description ends with **ติดตามเราได้ที่ / Follow us** (YouTube with `?sub_confirmation=1`, Facebook, TikTok, sister channels) - after the chapters and, for สรุปให้ฟัง, after the sources: links always last |
+| Long videos, after upload | Discord posts a **📌 comment to paste + pin** (a question + Facebook / TikTok links) - YouTube's API can't pin comments |
+| Shorts | links aren't clickable there, so only a plain-text line (`ดูฉบับเต็มบนช่อง สรุปให้ฟัง` / `Full version on our channel: ...`) - set the **Related video** in Studio |
+| Facebook Reels | ends with `ฉบับเต็ม 10 นาทีบน YouTube: สรุปให้ฟัง` / `Full video on YouTube: ...` **+ the URL** (the long version if one is up, else the channel link, else this video) |
+| TikTok, Instagram | the same line, **text only** (captions there aren't clickable) |
+
+`/links <channel>` in Discord shows the link set, the Follow block and the Shorts line, and checks
+that every URL answers HTTP 200 so dead links are caught. Only links in config are ever used -
+never other people's channels or affiliate links.
+
 ## Files
 
 | Path | What |
