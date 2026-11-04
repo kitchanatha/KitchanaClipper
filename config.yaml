@@ -381,6 +381,7 @@ channels:
     youtube_token: tokens/aion2_clips.json
     contains_synthetic_media: false   # real gameplay, no AI footage or voice
     short_gameplay_height: 760        # Shorts: gameplay strip height (608 = full 16:9 frame, higher = sides trimmed)
+    voice_id: bfGb7JTLUnZebZRiFYyq    # Adam - narration for patch / tips / news Shorts (clip-news)
     links:                  # cross-platform links (README 14) - fill in; empty ones are left out
       youtube: "https://www.youtube.com/@DaevaHighlights"
       facebook: ""

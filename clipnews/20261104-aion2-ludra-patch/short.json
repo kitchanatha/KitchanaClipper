@@ -1,0 +1,28 @@
+{
+  "channel": "aion2_clips",
+  "title": "Aion 2's Ludra patch in 50 seconds (new dungeon, title race, equal-stat PvP)",
+  "topic": "Aion 2 Global patch Nov 4 2026 - Abyssal Forge: Ludra",
+  "description": "Everything that matters in the Aion 2 Global patch of Nov 3 (PST) / Nov 4 (CET): the new Sanctuary dungeon Abyssal Forge: Ludra (Normal iL 2,800 / Hard iL 3,000, 1-hour runs), the Ludra Hunt title race (first 20 Hard parties per region, until Nov 25 CET), Chaotic Outer Reshanta equal-stat PvP (Lv 45+, 3 h/week), the Artifact Siege moving to Thursdays and Saturdays (+50% Abyss Corridor AP) and new 100%-success crafting recipes for True Dragon and Star Dragon gear.",
+  "sources": [
+    "Official patch notes (Steam): https://steamcommunity.com/games/3393110/announcements/detail/675136702174461957",
+    "Official patch notes (PlayNC): https://aion2.plaync.com/en-us/board/update/view?articleId=6aead0e86cfe4756db5b913f"
+  ],
+  "hashtags": ["#aion2", "#aion2global", "#ludra", "#mmorpg", "#patchnotes", "#shorts"],
+  "hook_text": "AION 2'S BIGGEST PATCH YET",
+  "parts": [
+    {"text": "Aion 2 just got its biggest patch yet. Here's everything that matters, fast.",
+     "clip": "twitch-2148656544", "src": 15.0},
+    {"text": "New dungeon: Abyssal Forge, Ludra. Normal needs item level twenty-eight hundred, Hard needs three thousand, and every run has a one-hour timer.",
+     "card": ["NEW DUNGEON: LUDRA", "NORMAL iL 2,800 | HARD iL 3,000", "1-HOUR TIMER"], "clip": "twitch-1661330142", "src": 0.0},
+    {"text": "The first twenty parties in each region to kill Hard Ludra get an exclusive title. You have until November twenty-fifth.",
+     "card": ["TITLE RACE", "FIRST 20 PARTIES PER REGION", "UNTIL NOV 25"], "clip": "twitch-2148656544", "src": 0.0},
+    {"text": "Chaotic Outer Reshanta is new PvP where everyone's stats are equalized. Level forty-five and up, three hours a week.",
+     "card": ["EQUAL-STAT PvP", "CHAOTIC OUTER RESHANTA", "LV 45+ | 3 HRS / WEEK"], "clip": "twitch-756983721", "src": 0.0},
+    {"text": "The Artifact Siege drops to Thursdays and Saturdays, but Abyss Corridor points go up fifty percent.",
+     "card": ["SIEGE: THU + SAT", "ABYSS CORRIDOR AP +50%"], "clip": "twitch-2148656544", "src": 16.0},
+    {"text": "And crafters: new recipes make True Dragon and Star Dragon gear with one hundred percent success. No great success combos, but no more fails.",
+     "card": ["100% CRAFTING", "TRUE + STAR DRAGON GEAR"], "clip": "twitch-1661330142", "src": 4.0},
+    {"text": "Which change are you jumping into first?",
+     "clip": "twitch-2405152945", "src": 2.0}
+  ]
+}

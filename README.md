@@ -598,7 +598,15 @@ python run.py clip-add D:\clips\fight.mp4 --creator "<name>"   # a file the crea
 python run.py clip-list
 python run.py clip-short <clip id> --start 3 --end 41 --title "1v3 clutch at the fortress" --hook "1V3 CLUTCH"
 python run.py clip-compile --clips id1,id2,id3 --title "Aion 2 best plays of the week #1"
+python run.py clip-news 20261104-aion2-ludra-patch   # voiced patch / tips / news Short from clipnews/<folder>/short.json
 ```
+
+**Patch, tips and news Shorts (`clip-news`).** Write `clipnews/<folder>/short.json`. It needs:
+- the title, description and sources (official patch notes);
+- a hook;
+- the parts: each one has narration, an optional fact card, and which permitted clip to show (with the second it starts at).
+
+The narration uses the channel's ElevenLabs `voice_id`. The gameplay is cropped to the game view, so the streamer's facecam and captions don't show, and its sound is muted. Every Short credits "GAMEPLAY: NAME" on screen, and lists the sources and creator credits in the description. These Shorts are marked as synthetic media, because the voice is AI.
 
 What gets made:
 - **Short:** 1080x1920 and at most 60 s. The gameplay sits in the middle over a blurred copy of itself (`short_gameplay_height`).

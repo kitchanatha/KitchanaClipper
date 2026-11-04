@@ -391,7 +391,7 @@ def main():
                                         "story-check", "story-prep", "story-build", "fonts",
                                         "news-research", "news-show", "news-approve", "news-build",
                                         "ideas", "report", "auth-analytics", "fb-auth", "tiktok-auth", "crosspost",
-                                        "clip-add", "clip-list", "clip-short", "clip-compile"])
+                                        "clip-add", "clip-list", "clip-short", "clip-compile", "clip-news"])
     ap.add_argument("slug", nargs="?", help="story folder name (story-* commands)")
     ap.add_argument("--lang", help="story languages, e.g. en or en,th,zh (default: all in config)")
     ap.add_argument("--yes", action="store_true", help="story-build: don't ask before paying for audio")
@@ -437,6 +437,12 @@ def main():
                     sys.exit('Usage: python run.py clip-short <clip id> --title "..." [--start S --end S --hook "..."]')
                 check_ffmpeg()
                 clipper.short(cfg, key, a.slug, a.start, a.end, a.title, a.hook, gameplay_height=608 if a.full_frame else None)
+            elif a.command == "clip-news":
+                if not a.slug:
+                    sys.exit("Usage: python run.py clip-news <folder in clipnews/>")
+                check_ffmpeg()
+                from pipeline import clipnews
+                clipnews.build(cfg, a.slug)
             elif a.command == "clip-compile":
                 if not (a.clips and a.title):
                     sys.exit('Usage: python run.py clip-compile --clips id1,id2,id3 --title "..."')
