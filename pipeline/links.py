@@ -63,7 +63,7 @@ def subscribe_url(url):
 
 
 def is_long(meta):
-    return meta.get("kind") == "story" or (meta.get("kind") == "news" and meta.get("variant") == "long")
+    return meta.get("kind") in ("story", "clip_compilation") or (meta.get("kind") == "news" and meta.get("variant") == "long")
 
 
 def follow_block(cfg, key):

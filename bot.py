@@ -68,7 +68,7 @@ IDEAS_MODE = os.environ.get("MACHINE_IDEAS", "").strip().lower() in ("1", "yes",
 IDEA_KEYS = [k for k, c in cfg["channels"].items() if c.get("trend_queries")] if IDEAS_MODE else []
 # Screen-recorded tutorial channels (Prompt Minute): review + upload here, made by hand (not in the
 # daily run or Make video - each tip needs a recording)
-TUTORIAL_KEYS = ([k for k, c in cfg["channels"].items() if c.get("type") == "tutorial"]
+TUTORIAL_KEYS = ([k for k, c in cfg["channels"].items() if c.get("type") in ("tutorial", "clipper")]
                  if IDEAS_MODE or NEWS_MODE else [])
 REVIEW_KEYS = list(dict.fromkeys(MY_CHANNELS + STORY_KEYS + NEWS_KEYS + IDEA_KEYS + TUTORIAL_KEYS))
 
@@ -162,7 +162,7 @@ class ReviewView(discord.ui.View):
 
 
 def is_short_channel(key):
-    return cfg["channels"].get(key, {}).get("type") not in ("story", "news", "tutorial")
+    return cfg["channels"].get(key, {}).get("type") not in ("story", "news", "tutorial", "clipper")
 
 
 class CaptionView(discord.ui.View):
@@ -468,7 +468,8 @@ async def daily_loop():
               f"{' (PAUSED)' if state['paused'] else ''}.\n{schedule_text()}")
     from pipeline.crosspost import validate_crosspost
     from pipeline.links import validate_links
-    probs = validate_crosspost(cfg) + validate_links(cfg)
+    from pipeline.clipper import validate_creators
+    probs = validate_crosspost(cfg) + validate_links(cfg) + validate_creators(cfg)
     if probs:  # config mistakes that could post to the wrong account or never post
         await say("⚠️ Cross-post config:\n" + "\n".join(f"• {p}" for p in probs))
     await post_panel()

@@ -61,7 +61,7 @@ def check_ffmpeg():
 def channel_keys(cfg, only=None, shorts_only=False):
     keys = list(cfg["channels"])
     if shorts_only:  # story / news channels have their own builders, not the Shorts generator
-        keys = [k for k in keys if cfg["channels"][k].get("type") not in ("story", "news", "tutorial")]
+        keys = [k for k in keys if cfg["channels"][k].get("type") not in ("story", "news", "tutorial", "clipper")]
     if only:
         if only not in keys:
             sys.exit(f"Unknown channel '{only}'. Options: {', '.join(keys)}")
@@ -390,7 +390,8 @@ def main():
     ap.add_argument("command", choices=["generate", "daily", "review", "upload", "auth", "test-video",
                                         "story-check", "story-prep", "story-build", "fonts",
                                         "news-research", "news-show", "news-approve", "news-build",
-                                        "ideas", "report", "auth-analytics", "fb-auth", "tiktok-auth", "crosspost"])
+                                        "ideas", "report", "auth-analytics", "fb-auth", "tiktok-auth", "crosspost",
+                                        "clip-add", "clip-list", "clip-short", "clip-compile"])
     ap.add_argument("slug", nargs="?", help="story folder name (story-* commands)")
     ap.add_argument("--lang", help="story languages, e.g. en or en,th,zh (default: all in config)")
     ap.add_argument("--yes", action="store_true", help="story-build: don't ask before paying for audio")
@@ -408,8 +409,41 @@ def main():
     ap.add_argument("--idea", type=int, help="generate: make idea N from the last 'ideas' list")
     ap.add_argument("--long", action="store_true",
                     help="news-research: deeper research for a long recap; news-build: the 16:9 long recap")
+    ap.add_argument("--creator", help="clip-add: creator name (for a local file the creator sent you)")
+    ap.add_argument("--start", type=float, default=0.0, help="clip-short: start second within the clip")
+    ap.add_argument("--end", type=float, default=0.0, help="clip-short: end second (default: clip end)")
+    ap.add_argument("--title", help="clip-short / clip-compile: video title")
+    ap.add_argument("--hook", help="clip-short: big headline for the first seconds")
+    ap.add_argument("--clips", help="clip-compile: clip ids, comma-separated, in order")
     a = ap.parse_args()
     cfg = load_config()
+    if a.command.startswith("clip-"):
+        from pipeline import clipper
+        keys = clipper.clipper_keys(cfg)
+        key = a.channel or (keys[0] if len(keys) == 1 else None)
+        if key not in keys:
+            sys.exit(f"--channel must be a clipper channel: {', '.join(keys) or 'none in config'}")
+        try:
+            if a.command == "clip-add":
+                if not a.slug:
+                    sys.exit("Usage: python run.py clip-add <clip URL or file> [--creator NAME]")
+                clipper.add(cfg, key, a.slug, a.creator)
+            elif a.command == "clip-list":
+                for r in clipper.list_clips(key):
+                    print(f"{r['id']:40} {r['duration']:6.1f}s  {r['creator']:16} {r['title'][:50]}")
+            elif a.command == "clip-short":
+                if not (a.slug and a.title):
+                    sys.exit('Usage: python run.py clip-short <clip id> --title "..." [--start S --end S --hook "..."]')
+                check_ffmpeg()
+                clipper.short(cfg, key, a.slug, a.start, a.end, a.title, a.hook)
+            elif a.command == "clip-compile":
+                if not (a.clips and a.title):
+                    sys.exit('Usage: python run.py clip-compile --clips id1,id2,id3 --title "..."')
+                check_ffmpeg()
+                clipper.compile_video(cfg, key, [c.strip() for c in a.clips.split(",") if c.strip()], a.title)
+        except clipper.ClipError as e:
+            sys.exit(str(e))
+        return
     if a.command == "generate" and a.idea:
         if not a.channel:
             sys.exit("--idea needs --channel")

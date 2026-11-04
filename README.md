@@ -578,6 +578,41 @@ Added at **upload time**, so videos already waiting for review get them too (`pi
 that every URL answers HTTP 200 so dead links are caught. Only links in config are ever used -
 never other people's channels or affiliate links.
 
+## 15. Clipper channels - Aion 2 Clips (streamer highlights, with permission)
+
+`aion2_clips` (`type: clipper`) makes three kinds of video from streamers' Aion 2 clips:
+- vertical highlight Shorts
+- 16:9 weekly compilations, with chapters
+- (planned) voiced tips and news recaps
+
+**Permission comes first.** A clip can only be added if its channel is in
+`channels.aion2_clips.creators`, with the `date` and `how` of the creator's permission. The check runs on the clip's
+metadata *before* anything is downloaded. If the creator isn't listed, the clip is refused.
+- A shortlist of streamers, ranked by viewers and follower growth, is in `permissions/aion2_streamers.md`, together with a message template for asking.
+- Keep each creator's reply (a screenshot) in `permissions/`.
+
+```
+py -3 -m pip install yt-dlp                       # once: reads/downloads Twitch, YouTube and Kick clips
+python run.py clip-add https://www.twitch.tv/<streamer>/clip/<id>
+python run.py clip-add D:\clips\fight.mp4 --creator "<name>"   # a file the creator sent you
+python run.py clip-list
+python run.py clip-short <clip id> --start 3 --end 41 --title "1v3 clutch at the fortress" --hook "1V3 CLUTCH"
+python run.py clip-compile --clips id1,id2,id3 --title "Aion 2 best plays of the week #1"
+```
+
+What gets made:
+- **Short:** 1080x1920 and at most 60 s. The gameplay sits in the middle over a blurred copy of itself (`short_gameplay_height`).
+  - The hook headline shows for the first 4 seconds.
+  - The credit "CLIP: NAME / twitch.tv/name" stays on screen the whole time.
+  - The streamer's original audio is kept, normalised to -14 LUFS.
+- **Compilation:** 1920x1080 with fades between clips and a credit lower-third on every clip.
+  - YouTube chapters are added when there are at least 3 clips, each at least 10 s long.
+  - The "Follow us" links block is added, the same as other long videos.
+
+Both are sent to Discord for review, like the other channels, and only upload after you press Approve.
+- Each description credits every creator, links the original clip, and has the fan-made disclaimer from `description_footer`.
+- `contains_synthetic_media: false`, because this is real gameplay with no AI footage or voice.
+
 ## Files
 
 | Path | What |

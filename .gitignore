@@ -19,3 +19,8 @@ fonts/NotoSerifSC-*.otf
 news/*/voice_*
 tutorials/*/raw.mp4
 tutorials/*/voice.*
+
+# clipper: streamers' footage and their permission screenshots stay on this PC
+clips/
+permissions/*
+!permissions/*.md

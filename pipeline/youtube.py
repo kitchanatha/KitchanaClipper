@@ -136,7 +136,8 @@ def upload(cfg, key, ch, folder):
         "status": {
             "privacyStatus": "private",
             "selfDeclaredMadeForKids": False,
-            "containsSyntheticMedia": bool(cfg["youtube"].get("contains_synthetic_media", True)),
+            "containsSyntheticMedia": bool(meta.get("contains_synthetic_media", ch.get(
+                "contains_synthetic_media", cfg["youtube"].get("contains_synthetic_media", True)))),
         },
     }
     # Unverified Google Cloud projects can only upload PRIVATE videos (YouTube rule), so a
