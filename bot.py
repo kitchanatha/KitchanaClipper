@@ -281,7 +281,7 @@ async def post_card(folder):
     key = folder.parent.name
     if meta.get("kind") == "story":
         return await post_story_card(folder, meta, key)
-    emb = discord.Embed(title=meta["title"][:250], description=fit_bytes(meta["script"], 3800),
+    emb = discord.Embed(title=meta["title"][:250], description=fit_bytes(meta.get("script") or meta.get("description", ""), 3800),
                         color=0x3D1E6D)
     emb.set_author(name=f"{meta['channel_name']}  ·  {MACHINE}")
     emb.set_footer(text=f"{meta['length_sec']}s  ·  {folder.name}")

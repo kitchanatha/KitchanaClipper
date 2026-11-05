@@ -232,6 +232,7 @@ def _write_review(cfg, key, slug, meta, script_text, build):
     finally:
         shutil.rmtree(work, ignore_errors=True)
     meta["length_sec"] = round(duration(out_dir / "video.mp4"), 1)
+    meta.setdefault("script", meta.get("description", ""))  # review cards show this (clips have no narration)
     meta["created"] = datetime.now().isoformat(timespec="seconds")
     (out_dir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     (out_dir / "script.txt").write_text(script_text, encoding="utf-8")

@@ -245,7 +245,7 @@ def cmd_review(cfg):
         print("\n" + "=" * 60)
         print(f"{meta['channel_name']}  |  {meta['title']}  ({meta['length_sec']}s)")
         print("-" * 60)
-        print(meta["script"])
+        print(meta.get("script") or meta.get("description", ""))
         open_file(p / "video.mp4")
         ans = input("\n[a]pprove  [r]eject  [s]kip  [q]uit > ").strip().lower()
         if ans == "q":
