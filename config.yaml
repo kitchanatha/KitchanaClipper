@@ -409,6 +409,22 @@ channels:
         url: https://www.twitch.tv/saigax
         extra_links: [https://www.youtube.com/@saigax]   # optional: more links he asked for in the description
         permission: {date: "2026-11-05", how: "email reply from saigaxstreaming@gmail.com", proof: "permissions/saigax.txt", notes: "asked: link his Twitch AND YouTube in the description"}
+      - name: Cxnzor
+        platform: twitch
+        channel: cxnzor
+        url: https://www.twitch.tv/cxnzor
+        permission: {date: "2026-11-05", how: "email reply from cxnzortv@gmail.com", proof: "permissions/cxnzor.txt", notes: "no extra rules"}
+      - name: aselon_eu          # he asked to be credited by his handle @aselon_eu
+        platform: twitch
+        channel: aselon_eu
+        url: https://www.twitch.tv/aselon_eu
+        permission: {date: "2026-11-05", how: "email reply from aselontwitch@gmail.com", proof: "permissions/aselon_eu.txt", notes: "OK monetised. On-screen handle + Twitch link. ASK FIRST for podcast clips or clips he already posted as a Short. Send him the link when the first one goes live."}
+      - name: KrixEW
+        platform: twitch
+        channel: krixew
+        url: https://www.twitch.tv/krixew
+        extra_links: [https://www.youtube.com/user/BlutoothD]   # the YouTube linked on his Twitch About page
+        permission: {date: "2026-11-05", how: "email reply from krixdomi@gmail.com", proof: "permissions/krixew.txt", notes: "asked: credit his YouTube as well"}
     #  - name: Stoopzz
     #    platform: twitch            # twitch | youtube | kick
     #    channel: stoopzz            # twitch login / youtube @handle / kick slug
