@@ -619,7 +619,7 @@ What gets made:
   - The "Follow us" links block is added, the same as other long videos.
 
 Both are sent to Discord for review, like the other channels, and only upload after you press Approve.
-- Each description credits every creator, links the original clip, and has the fan-made disclaimer from `description_footer`.
+- Each description credits every creator, links the original clip, and has the fan-made disclaimer from `description_footer`. The footer also invites other streamers to email their permission (or a removal request).
 - `contains_synthetic_media: false`, because this is real gameplay with no AI footage or voice.
 
 ## Files

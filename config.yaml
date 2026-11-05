@@ -389,7 +389,7 @@ channels:
       sister_channels: []   # [{name: "...", url: "https://..."}]
     publish_times: ["20:00"]
     hashtags: ["#aion2", "#aion", "#mmorpg", "#gaming", "#shorts"]
-    description_footer: "Fan-made highlights, not affiliated with or endorsed by NCSOFT. AION 2 is a trademark of NCSOFT. Clips are used with each creator's permission - creators can ask for removal any time."
+    description_footer: "🎥 Aion 2 streamer? Want your clips featured (with full credit + links)? Email gameboom2009@gmail.com with your Twitch/YouTube link and the word \"YES\" - or ask for removal any time at the same address.\n\nFan-made highlights, not affiliated with or endorsed by NCSOFT. AION 2 is a trademark of NCSOFT. Clips are used with each creator's permission - creators can ask for removal any time."
     # ONLY these creators' clips can be added. Add someone only AFTER they say yes, with the date, how
     # they agreed and a saved proof (permissions/). Shortlist + message template: permissions/aion2_streamers.md
     creators:
