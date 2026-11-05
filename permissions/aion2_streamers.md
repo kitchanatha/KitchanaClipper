@@ -58,3 +58,8 @@ When someone says yes, add them to config.yaml. Fill in `date`, how they agreed 
         url: https://www.twitch.tv/stoopzz
         permission: {date: "2026-11-05", how: "Twitch whisper", proof: "permissions/stoopzz.png", notes: ""}
 ```
+
+## Batch 2 (emailed 2026-11-05): TwitchMetrics growth list #24-#49, English Aion 2
+Anhthu, Arthars, TheHoned, missyboba, Cxnzor, AstralLight_, aselon_eu, Duky, solAshur, karyn, SFNF, Grobs_TV,
+nellan97, Moxsy, KrixEW, isanao. No public email: StewGamingTV, Zeivelle, Hwades, Xia_Tank, XenosysVex, Carian, sYnceDez.
+Status per streamer: aion2_contacts.csv.

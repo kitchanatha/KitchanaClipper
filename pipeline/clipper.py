@@ -149,7 +149,8 @@ def add(cfg, key, source, creator_name=None, log=print):
                 shutil.rmtree(d, ignore_errors=True)
                 raise ClipError("download failed: " + dl.stderr.strip()[-400:])
     rec = {"id": cid, "channel": key, "creator": c["name"], "platform": c["platform"], "creator_url": c["url"],
-           "creator_channel": c["channel"], "permission": c.get("permission", {}), "title": info.get("title", ""),
+           "creator_channel": c["channel"], "extra_links": list(c.get("extra_links") or []),
+           "permission": c.get("permission", {}), "title": info.get("title", ""),
            "source_url": info.get("webpage_url") or (source if not p.exists() else ""),
            "duration": round(duration(d / "source.mp4"), 2), "added": datetime.now().isoformat(timespec="seconds")}
     (d / "source.json").write_text(json.dumps(rec, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -179,6 +180,7 @@ def credit_lines(recs):
             continue
         seen.add(r["creator"])
         out.append(f"🎮 {r['creator']}: {r['creator_url']}")
+        out += [f"   {u}" for u in r.get("extra_links") or [] if u != r["creator_url"]]
     return out
 
 

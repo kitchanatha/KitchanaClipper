@@ -398,6 +398,17 @@ channels:
         channel: spidmmo
         url: https://www.twitch.tv/spidmmo
         permission: {date: "2026-11-04", how: "email reply from contact@spidmmo.com (Jawad Raja)", proof: "permissions/spidmmo.txt", notes: "no extra rules"}
+      - name: Elly
+        platform: twitch
+        channel: elly
+        url: https://www.twitch.tv/elly
+        permission: {date: "2026-11-05", how: "email reply from ellyellytv@gmail.com", proof: "permissions/elly.txt", notes: "no extra rules"}
+      - name: SaigaX
+        platform: twitch
+        channel: saigax
+        url: https://www.twitch.tv/saigax
+        extra_links: [https://www.youtube.com/@saigax]   # optional: more links he asked for in the description
+        permission: {date: "2026-11-05", how: "email reply from saigaxstreaming@gmail.com", proof: "permissions/saigax.txt", notes: "asked: link his Twitch AND YouTube in the description"}
     #  - name: Stoopzz
     #    platform: twitch            # twitch | youtube | kick
     #    channel: stoopzz            # twitch login / youtube @handle / kick slug

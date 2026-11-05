@@ -590,6 +590,7 @@ never other people's channels or affiliate links.
 metadata *before* anything is downloaded. If the creator isn't listed, the clip is refused.
 - A shortlist of streamers, ranked by viewers and follower growth, is in `permissions/aion2_streamers.md`, together with a message template for asking.
 - Keep each creator's reply (a screenshot) in `permissions/`.
+- If a creator asks for more links in the description (for example their YouTube as well as their Twitch), add `extra_links: [url, ...]` to their entry. Clips added after that list those links under the creator's credit.
 
 ```
 py -3 -m pip install yt-dlp                       # once: reads/downloads Twitch, YouTube and Kick clips
