@@ -423,7 +423,7 @@ channels:
         platform: twitch
         channel: krixew
         url: https://www.twitch.tv/krixew
-        extra_links: [https://www.youtube.com/user/BlutoothD]   # the YouTube linked on his Twitch About page
+        extra_links: [https://www.youtube.com/user/BlutoothD]   # confirmed by KrixEW 2026-11-05
         permission: {date: "2026-11-05", how: "email reply from krixdomi@gmail.com", proof: "permissions/krixew.txt", notes: "asked: credit his YouTube as well"}
     #  - name: Stoopzz
     #    platform: twitch            # twitch | youtube | kick
