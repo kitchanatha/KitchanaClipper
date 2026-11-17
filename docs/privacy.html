@@ -11,20 +11,30 @@
 </head>
 <body>
 <h1>Privacy Policy – KitchanaClipper</h1>
-<p><em>Last updated: 28 October 2026</em></p>
+<p><em>Last updated: 17 November 2026</em></p>
 
 <h2>What this app is</h2>
-<p>KitchanaClipper is a personal tool used only by its owner to publish short videos the owner
+<p>KitchanaClipper is a personal tool used only by its owner to publish videos the owner
 has made and approved to YouTube channels, Facebook Pages and TikTok accounts the owner
 controls. It is not offered to the public and has no other users.</p>
+
+<h2>YouTube API Services</h2>
+<p>KitchanaClipper uses YouTube API Services. By using it, you agree to be bound by the
+<a href="https://www.youtube.com/t/terms">YouTube Terms of Service</a>. Google's handling of data
+is described in the <a href="https://policies.google.com/privacy">Google Privacy Policy</a>.</p>
 
 <h2>Google user data it accesses</h2>
 <p>When the owner signs in with Google, the app requests these YouTube scopes:</p>
 <ul>
   <li><code>youtube.upload</code>: to upload videos the owner has approved to the owner's channel.</li>
-  <li><code>youtube.readonly</code>: to read the signed-in channel's name, so the app can confirm
-  it is uploading to the right channel.</li>
+  <li><code>youtube.readonly</code>: to read the signed-in channel's name and the processing status
+  of the owner's own uploads, so the app can confirm it is uploading to the right channel and that
+  an upload finished.</li>
+  <li><code>youtube.force-ssl</code>: to set the custom thumbnail, title, description and publish
+  time of the owner's own videos.</li>
 </ul>
+<p>The app only reads and changes the signed-in owner's own channel and videos. It does not read
+other channels, comments, subscribers or viewers' data.</p>
 
 <h2>Facebook (Meta) data it accesses</h2>
 <p>When the owner logs in with Facebook, the app requests <code>pages_show_list</code>,
@@ -43,11 +53,21 @@ account's TikTok inbox as a draft; the owner reviews and posts it in the TikTok 
   <li>The app does not collect, sell, share or transfer any user data to third parties.</li>
   <li>The app does not use platform data for advertising or to train AI models.</li>
   <li>The app does not read other people's profiles, messages, comments or followers.</li>
+  <li>The only YouTube data kept is a small record of the owner's own uploads (video ID, channel,
+  privacy setting, upload time) on the owner's computer, so the owner can find each video. No
+  cookies or tracking are used, and this website collects no data.</li>
 </ul>
+
+<h2>Keeping and deleting data</h2>
+<p>The owner's upload records (the video IDs of the owner's own uploads) are kept until the owner
+deletes them. Any other data read back from YouTube API Services, such as processing status, is
+used at the time it is read and is not stored beyond 30 days, in line with YouTube's developer
+policies. Revoking access (below) stops all further access straight away.</p>
 
 <h2>Removing access</h2>
 <p>Access can be removed at any time: Google at
-<a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>,
+<a href="https://security.google.com/settings/security/permissions">Google security settings</a>
+(<a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>),
 Facebook in Settings &gt; Business integrations, TikTok in Settings &gt; Security &gt; Manage app
 permissions. Deleting the local <code>tokens/</code> folder also removes the stored sign-ins.</p>
 
